@@ -11096,6 +11096,28 @@ wysihtml5.Commands = Base.extend(
     }
   };
 }(wysihtml5));
+;(function(wysihtml5){
+  wysihtml5.commands.sub= {
+    exec: function(composer, command) {
+      wysihtml5.commands.formatInline.execWithToggle(composer, command, "sub");
+    },
+
+    state: function(composer, command) {
+      return wysihtml5.commands.formatInline.state(composer, command, "sub");
+    }
+  };
+}(wysihtml5));
+;(function(wysihtml5){
+  wysihtml5.commands.sup = {
+    exec: function(composer, command) {
+      wysihtml5.commands.formatInline.execWithToggle(composer, command, "sup");
+    },
+
+    state: function(composer, command) {
+      return wysihtml5.commands.formatInline.state(composer, command, "sup");
+    }
+  };
+}(wysihtml5));
 ;(function(wysihtml5) {
   var undef,
       NODE_NAME = "A",
@@ -13775,6 +13797,8 @@ wysihtml5.views.View = Base.extend(
       shortcuts = {
         "66": "bold",     // B
         "73": "italic",   // I
+        "80": "sup",      // P
+        "83": "sub",      // S
         "85": "underline" // U
       };
 
