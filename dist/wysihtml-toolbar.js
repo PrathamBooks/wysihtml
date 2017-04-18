@@ -76,19 +76,19 @@ var wysihtml5 = {
 
   // element.textContent polyfill.
   if (Object.defineProperty && Object.getOwnPropertyDescriptor && Object.getOwnPropertyDescriptor(win.Element.prototype, "textContent") && !Object.getOwnPropertyDescriptor(win.Element.prototype, "textContent").get) {
-  	(function() {
-  		var innerText = Object.getOwnPropertyDescriptor(win.Element.prototype, "innerText");
-  		Object.defineProperty(win.Element.prototype, "textContent",
-  			{
-  				get: function() {
-  					return innerText.get.call(this);
-  				},
-  				set: function(s) {
-  					return innerText.set.call(this, s);
-  				}
-  			}
-  		);
-  	})();
+    (function() {
+      var innerText = Object.getOwnPropertyDescriptor(win.Element.prototype, "innerText");
+      Object.defineProperty(win.Element.prototype, "textContent",
+        {
+          get: function() {
+            return innerText.get.call(this);
+          },
+          set: function(s) {
+            return innerText.set.call(this, s);
+          }
+        }
+      );
+    })();
   }
 
   // isArray polyfill for ie8
@@ -4426,143 +4426,143 @@ wysihtml5.polyfills(window, document);
     
     return rangy;
 }, this);;/*
-	Base.js, version 1.1a
-	Copyright 2006-2010, Dean Edwards
-	License: http://www.opensource.org/licenses/mit-license.php
+  Base.js, version 1.1a
+  Copyright 2006-2010, Dean Edwards
+  License: http://www.opensource.org/licenses/mit-license.php
 */
 
 var Base = function() {
-	// dummy
+  // dummy
 };
 
 Base.extend = function(_instance, _static) { // subclass
-	var extend = Base.prototype.extend;
-	
-	// build the prototype
-	Base._prototyping = true;
-	var proto = new this;
-	extend.call(proto, _instance);
+  var extend = Base.prototype.extend;
+  
+  // build the prototype
+  Base._prototyping = true;
+  var proto = new this;
+  extend.call(proto, _instance);
   proto.base = function() {
     // call this method from any other method to invoke that method's ancestor
   };
-	delete Base._prototyping;
-	
-	// create the wrapper for the constructor function
-	//var constructor = proto.constructor.valueOf(); //-dean
-	var constructor = proto.constructor;
-	var klass = proto.constructor = function() {
-		if (!Base._prototyping) {
-			if (this._constructing || this.constructor == klass) { // instantiation
-				this._constructing = true;
-				constructor.apply(this, arguments);
-				delete this._constructing;
-			} else if (arguments[0] != null) { // casting
-				return (arguments[0].extend || extend).call(arguments[0], proto);
-			}
-		}
-	};
-	
-	// build the class interface
-	klass.ancestor = this;
-	klass.extend = this.extend;
-	klass.forEach = this.forEach;
-	klass.implement = this.implement;
-	klass.prototype = proto;
-	klass.toString = this.toString;
-	klass.valueOf = function(type) {
-		//return (type == "object") ? klass : constructor; //-dean
-		return (type == "object") ? klass : constructor.valueOf();
-	};
-	extend.call(klass, _static);
-	// class initialisation
-	if (typeof klass.init == "function") klass.init();
-	return klass;
+  delete Base._prototyping;
+  
+  // create the wrapper for the constructor function
+  //var constructor = proto.constructor.valueOf(); //-dean
+  var constructor = proto.constructor;
+  var klass = proto.constructor = function() {
+    if (!Base._prototyping) {
+      if (this._constructing || this.constructor == klass) { // instantiation
+        this._constructing = true;
+        constructor.apply(this, arguments);
+        delete this._constructing;
+      } else if (arguments[0] != null) { // casting
+        return (arguments[0].extend || extend).call(arguments[0], proto);
+      }
+    }
+  };
+  
+  // build the class interface
+  klass.ancestor = this;
+  klass.extend = this.extend;
+  klass.forEach = this.forEach;
+  klass.implement = this.implement;
+  klass.prototype = proto;
+  klass.toString = this.toString;
+  klass.valueOf = function(type) {
+    //return (type == "object") ? klass : constructor; //-dean
+    return (type == "object") ? klass : constructor.valueOf();
+  };
+  extend.call(klass, _static);
+  // class initialisation
+  if (typeof klass.init == "function") klass.init();
+  return klass;
 };
 
-Base.prototype = {	
-	extend: function(source, value) {
-		if (arguments.length > 1) { // extending with a name/value pair
-			var ancestor = this[source];
-			if (ancestor && (typeof value == "function") && // overriding a method?
-				// the valueOf() comparison is to avoid circular references
-				(!ancestor.valueOf || ancestor.valueOf() != value.valueOf()) &&
-				/\bbase\b/.test(value)) {
-				// get the underlying method
-				var method = value.valueOf();
-				// override
-				value = function() {
-					var previous = this.base || Base.prototype.base;
-					this.base = ancestor;
-					var returnValue = method.apply(this, arguments);
-					this.base = previous;
-					return returnValue;
-				};
-				// point to the underlying method
-				value.valueOf = function(type) {
-					return (type == "object") ? value : method;
-				};
-				value.toString = Base.toString;
-			}
-			this[source] = value;
-		} else if (source) { // extending with an object literal
-			var extend = Base.prototype.extend;
-			// if this object has a customised extend method then use it
-			if (!Base._prototyping && typeof this != "function") {
-				extend = this.extend || extend;
-			}
-			var proto = {toSource: null};
-			// do the "toString" and other methods manually
-			var hidden = ["constructor", "toString", "valueOf"];
-			// if we are prototyping then include the constructor
-			var i = Base._prototyping ? 0 : 1;
-			while (key = hidden[i++]) {
-				if (source[key] != proto[key]) {
-					extend.call(this, key, source[key]);
+Base.prototype = {  
+  extend: function(source, value) {
+    if (arguments.length > 1) { // extending with a name/value pair
+      var ancestor = this[source];
+      if (ancestor && (typeof value == "function") && // overriding a method?
+        // the valueOf() comparison is to avoid circular references
+        (!ancestor.valueOf || ancestor.valueOf() != value.valueOf()) &&
+        /\bbase\b/.test(value)) {
+        // get the underlying method
+        var method = value.valueOf();
+        // override
+        value = function() {
+          var previous = this.base || Base.prototype.base;
+          this.base = ancestor;
+          var returnValue = method.apply(this, arguments);
+          this.base = previous;
+          return returnValue;
+        };
+        // point to the underlying method
+        value.valueOf = function(type) {
+          return (type == "object") ? value : method;
+        };
+        value.toString = Base.toString;
+      }
+      this[source] = value;
+    } else if (source) { // extending with an object literal
+      var extend = Base.prototype.extend;
+      // if this object has a customised extend method then use it
+      if (!Base._prototyping && typeof this != "function") {
+        extend = this.extend || extend;
+      }
+      var proto = {toSource: null};
+      // do the "toString" and other methods manually
+      var hidden = ["constructor", "toString", "valueOf"];
+      // if we are prototyping then include the constructor
+      var i = Base._prototyping ? 0 : 1;
+      while (key = hidden[i++]) {
+        if (source[key] != proto[key]) {
+          extend.call(this, key, source[key]);
 
-				}
-			}
-			// copy each of the source object's properties to this object
-			for (var key in source) {
-				if (!proto[key]) extend.call(this, key, source[key]);
-			}
-		}
-		return this;
-	}
+        }
+      }
+      // copy each of the source object's properties to this object
+      for (var key in source) {
+        if (!proto[key]) extend.call(this, key, source[key]);
+      }
+    }
+    return this;
+  }
 };
 
 // initialise
 Base = Base.extend({
-	constructor: function() {
-		this.extend(arguments[0]);
-	}
+  constructor: function() {
+    this.extend(arguments[0]);
+  }
 }, {
-	ancestor: Object,
-	version: "1.1",
-	
-	forEach: function(object, block, context) {
-		for (var key in object) {
-			if (this.prototype[key] === undefined) {
-				block.call(context, object[key], key, object);
-			}
-		}
-	},
-		
-	implement: function() {
-		for (var i = 0; i < arguments.length; i++) {
-			if (typeof arguments[i] == "function") {
-				// if it's a function, call it
-				arguments[i](this.prototype);
-			} else {
-				// add the interface using the extend method
-				this.prototype.extend(arguments[i]);
-			}
-		}
-		return this;
-	},
-	
-	toString: function() {
-		return String(this.valueOf());
-	}
+  ancestor: Object,
+  version: "1.1",
+  
+  forEach: function(object, block, context) {
+    for (var key in object) {
+      if (this.prototype[key] === undefined) {
+        block.call(context, object[key], key, object);
+      }
+    }
+  },
+    
+  implement: function() {
+    for (var i = 0; i < arguments.length; i++) {
+      if (typeof arguments[i] == "function") {
+        // if it's a function, call it
+        arguments[i](this.prototype);
+      } else {
+        // add the interface using the extend method
+        this.prototype.extend(arguments[i]);
+      }
+    }
+    return this;
+  },
+  
+  toString: function() {
+    return String(this.valueOf());
+  }
 });;/**
  * Detect browser support for specific features
  */
@@ -8945,6 +8945,13 @@ wysihtml5.quirks.cleanPastedHTML = (function() {
         rules = extendRulesWithStyleExceptions(pickRuleset(options.rules, html) || {}, exceptStyles),
         newHtml;
 
+    // Date : 20/02/2017,  Author : Manoj,    Company : Mirafra
+    // Cleaning up random characters coming after closing html tag.
+    finalHtmlIndex = html.indexOf('</html>')
+    if(finalHtmlIndex !== -1){
+      html = html.slice(0,finalHtmlIndex+7)
+    }
+    // End of modification
     newHtml = wysihtml5.dom.parse(html, {
       "rules": rules,
       "cleanUp": true, // <span> elements, empty or without attributes, should be removed/replaced with their content
@@ -9910,6 +9917,11 @@ wysihtml5.quirks.ensureProperClearing = (function() {
       while (node.firstChild) {
         fragment.appendChild(node.firstChild);
       }
+      //Adding a dummy last node to identify the end of copy/paste
+
+      dummyPNode = this.doc.createElement('P');
+      dummyPNode.setAttribute("id","dummyNode");
+      fragment.appendChild(dummyPNode);
       this.insertNode(fragment);
 
       if (lastChild) {
@@ -11910,7 +11922,7 @@ wysihtml5.Commands = Base.extend(
         "em":     "i",
         "b":      "strong",
         "i":      "em"
-      },
+      },      
       htmlApplier = {};
 
   function _getTagNames(tagName) {
@@ -11927,10 +11939,10 @@ wysihtml5.Commands = Base.extend(
     if (cssStyle) {
       identifier += ":" + cssStyle;
     }
-
-    if (!htmlApplier[identifier]) {
-      htmlApplier[identifier] = new wysihtml5.selection.HTMLApplier(_getTagNames(tagName), className, classRegExp, true, cssStyle, styleRegExp, container);
-    }
+    
+    //if (!htmlApplier[identifier]) {
+    htmlApplier[identifier] = new wysihtml5.selection.HTMLApplier(_getTagNames(tagName), className, classRegExp, true, cssStyle, styleRegExp, container);
+   // }
 
     return htmlApplier[identifier];
   }
@@ -11946,6 +11958,7 @@ wysihtml5.Commands = Base.extend(
       composer.selection.getSelection().removeAllRanges();
 
       _getApplier(tagName, className, classRegExp, cssStyle, styleRegExp, composer.element).toggleRange(ownRanges);
+ 
 
       if (!dontRestoreSelect) {
         range.setStart(ownRanges[0].startContainer,  ownRanges[0].startOffset);
@@ -12894,12 +12907,73 @@ wysihtml5.Commands = Base.extend(
 
       this.editor
         .on("newword:composer", function() {
-          that.transact();
+          that.transact();          
+        })
+
+        .on('interaction', function (){
+          that.splitInlineBlocks();
         })
 
         .on("beforecommand:composer", function() {
           that.transact();
         });
+    },
+    // Author: Manoj, Company : Mirafra, Date : 03-04-2017
+    splitInlineBlocks: function(){
+          function splitUpInlineBlocks(fontType){
+              divElement = document.getElementById('txtEditor')
+              spans = divElement.getElementsByClassName(fontType)
+              no_of_spans = spans.length
+              var i;
+              var j = 0;
+              for (i = 0;  i< no_of_spans ; i++) {
+                currSpan = spans[j]
+                childNodes = currSpan.childNodes
+                cLength = childNodes.length
+                // Empty span
+                if(cLength === 0){
+                  currSpan.parentNode.removeChild(currSpan);
+                  continue;
+                }
+                // Other nodes inside of the span
+                if(childNodes[0].nodeType !== 3){
+                  currSpan.parentNode.insertBefore(childNodes[0],currSpan)
+                  continue;
+                }
+
+                data = childNodes[0].nodeValue
+                wordData = data.replace(/\u00a0/g, " ")
+                words = wordData.split(" ")
+                if (words.length <=1 && cLength <=1){
+                  j++;
+                  continue;
+                }
+                var w;
+                for (w = 0;  w< words.length; w++){
+                  var newSpan = document.createElement('span');
+                  newSpan.setAttribute('class',fontType)
+                  if (w == words.length-1){ 
+                    newSpan.innerHTML = words[w]
+                  }else{
+                    newSpan.innerHTML = words[w] + "\u00a0"
+                  }
+                  currSpan.parentNode.insertBefore(newSpan, currSpan)
+                  j++;
+                }
+                if(cLength <=1){
+                  currSpan.parentNode.removeChild(currSpan)         
+                }else{
+                  currSpan.removeChild(childNodes[0])
+                }
+              }
+          }
+          
+          splitUpInlineBlocks("text-font-largest");
+          splitUpInlineBlocks("text-font-large");
+          splitUpInlineBlocks("text-font-normal");
+          splitUpInlineBlocks("text-font-small");
+          splitUpInlineBlocks("text-font-smallest");
+          splitUpInlineBlocks("text-font-medium");
     },
 
     transact: function() {
@@ -13935,7 +14009,7 @@ wysihtml5.views.View = Base.extend(
       if (this.domNodeRemovedInterval) {
         clearInterval(domNodeRemovedInterval);
       }
-      this.parent.fire("destroy:composer");
+    this.parent.fire("destroy:composer");
   };
 
   // Listens to "drop", "paste", "mouseup", "focus", "keyup" events and fires
@@ -14165,6 +14239,7 @@ wysihtml5.views.View = Base.extend(
     focusBlurElement.addEventListener("blur",  handleBlur.bind(this), false);
     
     addListeners(this.element, ["drop", "paste", "beforepaste"], handlePaste.bind(this), false);
+
     this.element.addEventListener("copy",       handleCopy.bind(this), false);
     this.element.addEventListener("mousedown",  handleMouseDown.bind(this), false);
     this.element.addEventListener("mouseover",  handleMouseOver.bind(this), false);
@@ -14653,8 +14728,204 @@ wysihtml5.views.View = Base.extend(
         "rules": this.config.pasteParserRulesets || [{"set": this.config.parserRules}],
         "uneditableClass": this.config.classNames.uneditableContainer
       });
+
+      // Date :09.02.2017  Author : Manoj
+      // Getting the initial nodes and position of the marker
+      beginSel = window.getSelection();
+      bAncNode = beginSel.anchorNode;
+      bOffSet = beginSel.anchorOffset;      
+      
+        /// Default case
       this.composer.selection.deleteContents();
       this.composer.selection.insertHTML(cleanHtml);
+
+        /// Default case
+      try {
+        // Limit node where we have to close the tags
+        beginLimParent = bAncNode
+        if (beginLimParent.nodeName == 'P') {
+          //No need to do additional processing
+          parentPNode = beginLimParent;
+        }
+        else {
+          if (beginLimParent.parentNode.nodeName == 'P') {
+            // No need to do additional processing
+            parentPNode = beginLimParent.parentNode;
+          }
+          else {
+            while(beginLimParent.parentNode.nodeName != 'P'){
+              beginLimParent = beginLimParent.parentNode;
+            }
+
+            parentPNode = beginLimParent.parentNode;
+
+            // Node which contains the copy/pasted content
+            cutoffNode = bAncNode.parentNode
+
+            //getting the last copy node: created a dummy node to 
+            //keep track of the last node we are copying
+            var dummyNode = document.getElementById('dummyNode');
+            lastCopyNode = dummyNode.previousSibling;
+            dummyNode.parentNode.removeChild(dummyNode);
+
+
+            // Closing the tags before pasted content
+            parent = beginLimParent.parentNode
+            var parentOffset = getNodeIndex(parent,beginLimParent)
+            var doc = bAncNode.ownerDocument
+            var leftRange = doc.createRange()
+            leftRange.setStart(parent,parentOffset)
+            leftRange.setEnd(bAncNode,bOffSet)
+            var left = leftRange.extractContents()
+            parent.insertBefore(left,beginLimParent)
+            var innerEl;
+            // If there are no element parent nodes until P node, skip this  
+            if(beginLimParent.nodeType != 3){               
+             while (cutoffNode.firstChild != null) {
+                child = cutoffNode.firstChild;
+                parent.insertBefore(child, beginLimParent)
+                if (child == lastCopyNode) {
+                  break;
+                }
+              }
+            }
+          }
+        }
+        pElements = parentPNode.getElementsByTagName("p")
+        numP = pElements.length
+
+        // handling P tags, removing p tags inside of p
+
+	      if (numP == 0) {
+		     // If there are no p's the tree is already correct as all the tags
+         // can be nested
+         cleanUpBrTags(parentPNode)
+	      } else if(numP == 1) {
+
+          pNode = pElements[0]
+          // Move the children to outside of 'p' and delete the 'p' Node
+          var innerEl;
+          while(innerEl=pNode.firstChild){
+            parentPNode.insertBefore(innerEl,pNode)
+          }
+          parentPNode.removeChild(pNode)
+
+          cleanUpBrTags(parentPNode)
+
+        } else {
+          firstPNode = pElements[0]
+          lastPNode = pElements[pElements.length - 1]
+
+          // Splitting the node at beginning of copy-paste
+          divParent = parentPNode.parentNode
+          var divParentOffSet = getNodeIndex(divParent, parentPNode)
+          var bdoc = parentPNode.ownerDocument
+          var lRange = bdoc.createRange()
+          lRange.setStart(divParent, divParentOffSet)
+          lRange.setEndAfter(firstPNode)
+          var lCon = lRange.extractContents()
+          divParent.insertBefore(lCon,parentPNode)
+
+          // First P node of the line
+          fPrevNode = parentPNode.previousSibling
+          // Moving the middle copy/pasted content outside of parent 'p' tag
+          var innerEl = parentPNode.firstChild;
+          while(innerEl != lastPNode){
+            divParent.insertBefore(innerEl,parentPNode)
+            innerEl = parentPNode.firstChild
+          }
+          // Merging the first 'p' of copy/paste with the first 'p' of the line
+          firstPToRemove = fPrevNode.getElementsByTagName('P')
+          var innerEl;
+          while(innerEl=firstPToRemove[0].firstChild){
+            fPrevNode.insertBefore(innerEl,firstPToRemove[0])
+          }
+          fPrevNode.removeChild(firstPToRemove[0])
+          
+          // Merging the last 'p' of copy/paste with the last 'p' of the line 
+          lastPToRemove = parentPNode.getElementsByTagName('P')
+          var innerEl;
+          while(innerEl=lastPToRemove[0].firstChild){
+            parentPNode.insertBefore(innerEl,lastPToRemove[0])
+          }
+          parentPNode.removeChild(lastPToRemove[0]) 
+          // Cleanup the br tags from fPrevNode to parentPnode (since this is the end P node)
+
+          var currNode = fPrevNode;
+          var nextNode;
+          while((currNode !== null) && (currNode.previousSibling != parentPNode) ){
+            nextNode = currNode.nextSibling;
+            cleanUpBrTags(currNode);
+            currNode = nextNode;
+          }
+        }
+
+        // Removing br and replacing them with the the 'p' tags to maintain styling
+        function cleanUpBrTags(parentNode){
+          if(parentNode.nodeType === 3){
+            return;
+          }
+          var isPNode = (parentNode.nodeName === 'P')
+          if(isPNode){
+            //Split P node
+            brTags = parentNode.getElementsByTagName('BR')
+            while(brTags[0]){
+              // split the p node into two and delete the br tag
+              splitPNodesOnBr(parentNode, brTags[0])
+              brTags[0].parentNode.removeChild(brTags[0])              
+            }
+          }else{
+            // find previous p and put the contents from that to here in a new p tag
+            prevPNode = parentNode.previousSibling
+            while(prevPNode.nodeName != 'P'){
+              prevPNode = prevPNode.previousSibling
+            }
+
+            if (parentNode.nodeName === 'BR') {
+              brTag = parentNode
+            } else {
+              brTags = parentNode.getElementsByTagName('BR')
+              brTag = brTags[0]
+            }
+
+            while(brTag){
+              parent = prevPNode.parentNode
+              var doc = prevPNode.ownerDocument;
+              var leftRange = doc.createRange();
+              leftRange.setStartAfter(prevPNode);
+              leftRange.setEndBefore(brTag);
+              var newPNode = doc.createElement("p");
+              leftRange.surroundContents(newPNode);
+              brTag.parentNode.removeChild(brTag)
+            }
+          }
+        }
+
+        function splitPNodesOnBr(node,brNode){
+          parent = node.parentNode;
+          var parentOffset = getNodeIndex(parent,node);
+          var doc = brNode.ownerDocument;
+          var leftRange = doc.createRange();
+          leftRange.setStart(parent,parentOffset);
+          leftRange.setEndBefore(brNode);
+          var left = leftRange.extractContents();
+          parent.insertBefore(left,node);
+        }
+
+
+        function getNodeIndex(parent, node) {
+          var index = parent.childNodes.length;
+          while (index--) {
+            if (node === parent.childNodes[index]) {
+              break;
+            }
+          }
+          return index;
+        }
+      }catch(e){
+        
+      }
+      //End of modification
     }
   });
 })(wysihtml5);
