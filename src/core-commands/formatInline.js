@@ -652,6 +652,23 @@
     cleanEditor: function(composer){
       getPElements = composer.element.getElementsByTagName("P")
 
+      if(composer.isEmpty()){
+        var paragraph = composer.doc.createElement("P");
+        var sp = composer.doc.createElement("span");
+        sp.className = "text-font-normal";
+        sp.innerHTML = "<br>"
+        paragraph.appendChild(sp);
+        composer.element.appendChild(paragraph);
+        if (!browser.displaysCaretInEmptyContentEditableCorrectly()) {
+          //paragraph.innerHTML = "<br>";
+          composer.selection.setBefore(paragraph.firstChild.firstChild);
+        } else {
+          composer.selection.selectNode(paragraph.firstChild, true);
+        }
+
+        return;
+      }
+      
       var b = composer.selection.getBookmark();
 
       for(i=0; i < getPElements.length; i++){
