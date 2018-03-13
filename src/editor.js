@@ -466,11 +466,16 @@
         var k;
         for(k=0; k < childNodes.length; k++){
           if(childNodes[k].nodeName !== 'P'){
+            if(childNodes[k].nodeName === "BR"){
+              childNodes[k].parentNode.removeChild(childNodes[k]);
+              k--;
+              continue;
+            }
             newPNode = this.composer.doc.createElement("P");
             innerNode = childNodes[k];
             newPNode.appendChild(innerNode);
-            if(childNodes[k+1]){
-              divElem.insertBefore(newPNode, childNodes[k+1]);
+            if(childNodes[k]){
+              divElem.insertBefore(newPNode, childNodes[k]);
             }else{
               divElem.appendChild(newPNode);
             }
@@ -519,11 +524,17 @@
       dNode.parentNode.removeChild(dNode);
 
       if(after){
+        if(!cursorNode.nextSibling){
+          //create a new span node
+          newSpNode = this.composer.doc.createElement("span");
+          this.composer.element.appendChild(newSpNode);
+        }
         this.composer.selection.setAfter(cursorNode)
       }else {
         this.composer.selection.setBefore(cursorNode)
       }
       
+      wysihtml.commands.formatInline.cleanEditor(this.composer);
 
       //End of modification
     }
