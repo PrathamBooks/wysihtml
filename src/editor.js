@@ -497,7 +497,7 @@
         cNodes = pNode.childNodes;
         var l;
         for (l=0; l < cNodes.length; l++){
-          if(cNodes[l].nodeType === 3){
+          if(cNodes[l].nodeName !== "SPAN"){
             return true;
           }
         }

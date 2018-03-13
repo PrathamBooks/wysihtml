@@ -13634,6 +13634,72 @@ wysihtml.Commands = Base.extend(
       options = fixOptions(options);
       var nodes = getState(composer, options, true).nodes;
       return (nodes.length === 0) ? false : nodes;
+    },
+
+    cleanEditor: function(composer){
+      getPElements = composer.element.getElementsByTagName("P")
+
+      var b = composer.selection.getBookmark();
+
+      for(i=0; i < getPElements.length; i++){
+        pNode = getPElements[i]
+        //if No span then add a text-font-normal span class
+        if(pNode.firstChild && pNode.firstChild.nodeName != "SPAN"){
+          spNode = composer.doc.createElement("span");
+          spNode.className = "text-font-normal";
+          spNode.innerHTML = pNode.innerHTML;
+          pNode.innerHTML = "";
+          pNode.appendChild(spNode);
+        }
+      }
+      
+      function onlySpanNodes(spNode) {
+        var cNodes = spNode.childNodes;
+        var l;
+
+        if(cNodes && cNodes.length === 0){
+          return true;
+        }
+
+        for(l=0; l< cNodes.length; l++){
+          if(cNodes[l].nodeName !== "span" && cNodes[l].nodeName !== "BR"){
+            return false;
+          }
+        }
+        return true;
+      }
+
+      //getPElements2 = this.element.getElementsByTagName("P")
+
+      var j;
+      for(j=0; j < getPElements.length; j++) {
+        pNode = getPElements[j]
+        spanNodes = pNode.getElementsByTagName("span");
+        var k;
+        for(k =0; k< spanNodes.length; k++){
+          // Dont delete if they have other nodes than span nodes.
+          if(onlySpanNodes(spanNodes[k])){
+            // delete the node and movse its children .
+            if(k !== spanNodes.length-1){
+              var m;
+              var no_of_childNodes = spanNodes[k].childNodes.length;
+              for (m =0 ; m < no_of_childNodes ; m++){
+                spanNodes[k].parentNode.insertBefore(spanNodes[k].childNodes[0], spanNodes[k+1]);
+              }
+              spanNodes[k].parentNode.removeChild(spanNodes[k]);
+              k--; 
+            } else {
+              var n;
+              var no_of_childNodes = spanNodes[k].childNodes.length;
+              for (n =0 ; n < no_of_childNodes ; n++){
+                spanNodes[k].parentNode.appendChild(spanNodes[k].childNodes[0]);
+              }              
+              spanNodes[k].parentNode.removeChild(spanNodes[k]);
+              k--;
+            }
+          } 
+        }
+      }
     }
   };
 
@@ -15397,22 +15463,7 @@ wysihtml.views.View = Base.extend(
     // Author : Manoj, Date: 26/04/2017
     // To handle the deletion of span tags when deleting the content.
     if((keyCode === wysihtml.DELETE_KEY  || keyCode === wysihtml.BACKSPACE_KEY) && this.element.id === "txtEditor"){
-      getPElements = this.element.getElementsByTagName("P")
-
-      var b = this.selection.getBookmark();
-
-      for(i=0; i < getPElements.length; i++){
-        pNode = getPElements[i]
-        //if No span then add a text-font-normal span class
-        if(pNode.firstChild && pNode.firstChild.nodeName != "SPAN"){
-           spNode = this.doc.createElement("span");
-           spNode.className = "text-font-normal";
-           spNode.innerHTML = pNode.innerHTML;
-           pNode.innerHTML = "";
-           pNode.appendChild(spNode);
-        }
-      }
-      this.selection.setBookmark(b);
+      wysihtml.commands.formatInline.cleanEditor(this);
     }
   };
 
@@ -16374,7 +16425,7 @@ wysihtml.views.Textarea = wysihtml.views.View.extend(
         cNodes = pNode.childNodes;
         var l;
         for (l=0; l < cNodes.length; l++){
-          if(cNodes[l].nodeType === 3){
+          if(cNodes[l].nodeName !== "SPAN"){
             return true;
           }
         }
