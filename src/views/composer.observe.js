@@ -14,9 +14,11 @@
        * Map keyCodes to query commands
        */
       shortcuts = {
-        "66": "bold",     // B
-        "73": "italic",   // I
-        "85": "underline" // U
+        "66": "bold",         // B
+        "73": "italic",       // I
+        "80": "superscript",  // P
+        "83": "subscript",    // S
+        "85": "underline"     // U
       };
 
   var actions = {
@@ -397,6 +399,27 @@
     var keyCode = event.keyCode;
     if (keyCode === wysihtml.SPACE_KEY || keyCode === wysihtml.ENTER_KEY) {
       this.parent.fire("newword:composer");
+    }
+
+    // Author : Manoj, Date: 26/04/2017
+    // To handle the deletion of span tags when deleting the content.
+    if((keyCode === wysihtml.DELETE_KEY  || keyCode === wysihtml.BACKSPACE_KEY) && this.element.id === "txtEditor"){
+      getPElements = this.element.getElementsByTagName("P")
+
+      var b = this.selection.getBookmark();
+
+      for(i=0; i < getPElements.length; i++){
+        pNode = getPElements[i]
+        //if No span then add a text-font-normal span class
+        if(pNode.firstChild && pNode.firstChild.nodeName != "SPAN"){
+           spNode = this.doc.createElement("span");
+           spNode.className = "text-font-normal";
+           spNode.innerHTML = pNode.innerHTML;
+           pNode.innerHTML = "";
+           pNode.appendChild(spNode);
+        }
+      }
+      this.selection.setBookmark(b);
     }
   };
 

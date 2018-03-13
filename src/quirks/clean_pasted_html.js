@@ -61,6 +61,14 @@ wysihtml.quirks.cleanPastedHTML = (function() {
         },
         rules = extendRulesWithStyleExceptions(pickRuleset(options.rules, html) || {}, exceptStyles),
         newHtml;
+        
+    // Date : 20/02/2017,  Author : Manoj,    Company : Mirafra
+    // Cleaning up random characters coming after closing html tag.
+    var finalHtmlIndex = html.indexOf('</html>')
+    if(finalHtmlIndex !== -1){
+      html = html.slice(0,finalHtmlIndex + 7)
+    }
+    // End of modification
 
     newHtml = wysihtml.dom.parse(html, {
       "rules": rules,

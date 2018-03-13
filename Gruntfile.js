@@ -25,7 +25,10 @@ module.exports = function(grunt) {
     'src/views/synchronizer.js',
     'src/views/sourceview.js',
     'src/views/textarea.js',
-    'src/editor.js'
+    'src/editor.js',
+    'src/commands-font/*',
+    'src/table.js',
+    'src/dialog.js'
   ];
 
   // Project configuration.

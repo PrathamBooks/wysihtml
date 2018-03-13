@@ -9571,10 +9571,7 @@ wysihtml.dom.parse = function(elementOrHtml_current, config_current) {
         "3": "wysiwyg-font-size-medium",
         "4": "wysiwyg-font-size-large",
         "5": "wysiwyg-font-size-x-large",
-        "6": "wysiwyg-font-size-xx-large",
-        "7": "wysiwyg-font-size-xx-large",
-        "-": "wysiwyg-font-size-smaller",
-        "+": "wysiwyg-font-size-larger"
+        "6": "wysiwyg-font-size-xx-large"
       };
       return function(attributeValue) {
         return mapping[String(attributeValue).charAt(0)];
@@ -10295,6 +10292,14 @@ wysihtml.quirks.cleanPastedHTML = (function() {
         },
         rules = extendRulesWithStyleExceptions(pickRuleset(options.rules, html) || {}, exceptStyles),
         newHtml;
+        
+    // Date : 20/02/2017,  Author : Manoj,    Company : Mirafra
+    // Cleaning up random characters coming after closing html tag.
+    var finalHtmlIndex = html.indexOf('</html>')
+    if(finalHtmlIndex !== -1){
+      html = html.slice(0,finalHtmlIndex + 7)
+    }
+    // End of modification
 
     newHtml = wysihtml.dom.parse(html, {
       "rules": rules,
@@ -11384,6 +11389,12 @@ wysihtml.quirks.ensureProperClearing = (function() {
         while (node.firstChild) {
           fragment.appendChild(node.firstChild);
         }
+
+        //Adding a dummy last node to identify the end of copy/paste
+        var dummyPNode = this.doc.createElement('span');
+        dummyPNode.setAttribute("id","dummyNode");
+        fragment.appendChild(dummyPNode);
+
         range.insertNode(fragment);
 
         lastEditorElement = this.contain.lastChild;
@@ -14713,17 +14724,21 @@ wysihtml.views.View = Base.extend(
 
       // Ensures when editor is empty and not line breaks mode, the inital state has a paragraph in it on focus with caret inside paragraph
       if (!this.config.useLineBreaks) {
-        dom.observe(this.element, ["focus"], function() {
+        dom.observe(this.element, ["focus", "keydown"], function() {
           if (that.isEmpty()) {
             setTimeout(function() {
               var paragraph = that.doc.createElement("P");
+              var sp = that.doc.createElement("span");
+              sp.className = "text-font-normal";
+              sp.innerHTML += "<br>"
               that.element.innerHTML = "";
+              paragraph.appendChild(sp);
               that.element.appendChild(paragraph);
               if (!browser.displaysCaretInEmptyContentEditableCorrectly()) {
-                paragraph.innerHTML = "<br>";
-                that.selection.setBefore(paragraph.firstChild);
+                // paragraph.innerHTML = "<br>";
+                that.selection.setBefore(paragraph.firstChild.firstChild);
               } else {
-                that.selection.selectNode(paragraph, true);
+                that.selection.selectNode(paragraph.firstChild, true);
               }
             }, 0);
           }
@@ -14992,9 +15007,11 @@ wysihtml.views.View = Base.extend(
        * Map keyCodes to query commands
        */
       shortcuts = {
-        "66": "bold",     // B
-        "73": "italic",   // I
-        "85": "underline" // U
+        "66": "bold",         // B
+        "73": "italic",       // I
+        "80": "superscript",  // P
+        "83": "subscript",    // S
+        "85": "underline"     // U
       };
 
   var actions = {
@@ -15375,6 +15392,27 @@ wysihtml.views.View = Base.extend(
     var keyCode = event.keyCode;
     if (keyCode === wysihtml.SPACE_KEY || keyCode === wysihtml.ENTER_KEY) {
       this.parent.fire("newword:composer");
+    }
+
+    // Author : Manoj, Date: 26/04/2017
+    // To handle the deletion of span tags when deleting the content.
+    if((keyCode === wysihtml.DELETE_KEY  || keyCode === wysihtml.BACKSPACE_KEY) && this.element.id === "txtEditor"){
+      getPElements = this.element.getElementsByTagName("P")
+
+      var b = this.selection.getBookmark();
+
+      for(i=0; i < getPElements.length; i++){
+        pNode = getPElements[i]
+        //if No span then add a text-font-normal span class
+        if(pNode.firstChild && pNode.firstChild.nodeName != "SPAN"){
+           spNode = this.doc.createElement("span");
+           spNode.className = "text-font-normal";
+           spNode.innerHTML = pNode.innerHTML;
+           pNode.innerHTML = "";
+           pNode.appendChild(spNode);
+        }
+      }
+      this.selection.setBookmark(b);
     }
   };
 
@@ -16095,8 +16133,2843 @@ wysihtml.views.Textarea = wysihtml.views.View.extend(
         "rules": this.config.pasteParserRulesets || [{"set": this.config.parserRules}],
         "uneditableClass": this.config.classNames.uneditableContainer
       });
+      
+      // Date :09.02.2017  Author : Manoj
+      // Getting the initial nodes and position of the marker
+      var beginSel = window.getSelection();
+      var bAncNode = beginSel.anchorNode;
+      var bOffSet = beginSel.anchorOffset;
+
       this.composer.selection.deleteContents();
       this.composer.selection.insertHTML(cleanHtml);
+
+      // Default case
+      try {
+        // Limit node where we have to close the tags
+        beginLimParent = bAncNode
+        if (beginLimParent.nodeName == 'P') {
+          //No need to do additional processing
+          parentPNode = beginLimParent;
+        }
+        else {
+          if (beginLimParent.nodeType ===3 && beginLimParent.parentNode.nodeName == 'P') {
+            // No need to do additional processing
+            parentPNode = beginLimParent.parentNode;  
+          }
+          else {
+            while(beginLimParent.parentNode.nodeName != 'P'){
+              beginLimParent = beginLimParent.parentNode;
+            }
+
+            parentPNode = beginLimParent.parentNode;
+
+            // Node which contains the copy/pasted content
+            if (bAncNode.parentNode.nodeName !== 'P') {
+              cutoffNode = bAncNode.parentNode
+            } else {
+              cutoffNode = bAncNode;
+            }
+
+            //getting the last copy node: created a dummy node to 
+            //keep track of the last node we are copying
+            var dummyNode = document.getElementById('dummyNode');
+            lastCopyNode = dummyNode.previousSibling;
+
+            // Closing the tags before pasted content
+            parent = beginLimParent.parentNode
+            var parentOffset = getNodeIndex(parent,beginLimParent)
+            var doc = bAncNode.ownerDocument
+            var leftRange = doc.createRange()
+            leftRange.setStart(parent,parentOffset)
+            leftRange.setEnd(bAncNode,bOffSet)
+            var left = leftRange.extractContents()
+            parent.insertBefore(left,beginLimParent)
+            var innerEl;
+            // If there are no element parent nodes until P node, skip this  
+            if(beginLimParent.nodeType != 3){               
+              while (cutoffNode.firstChild != null) {
+                child = cutoffNode.firstChild;
+                parent.insertBefore(child, beginLimParent)
+                if (child == lastCopyNode) {
+                  break;
+                }
+              }
+            }
+          }
+        }        
+
+        pElements = parentPNode.getElementsByTagName("p")
+        numP = pElements.length
+
+        // handling P tags, removing p tags inside of p
+
+        if (numP == 0) {
+          // If there are no p's the tree is already correct as all the tags
+          // can be nested
+          cleanUpBrTags(parentPNode)
+        } else if(numP == 1) {
+
+          pNode = pElements[0]
+          // Move the children to outside of 'p' and delete the 'p' Node
+          var innerEl;
+          while(innerEl=pNode.firstChild){
+            parentPNode.insertBefore(innerEl,pNode)
+          }
+          parentPNode.removeChild(pNode)
+
+          cleanUpBrTags(parentPNode)
+
+        } else {
+          firstPNode = pElements[0]
+          lastPNode = pElements[pElements.length - 1]
+
+          // Splitting the node at beginning of copy-paste
+          divParent = parentPNode.parentNode
+          var divParentOffSet = getNodeIndex(divParent, parentPNode)
+          var bdoc = parentPNode.ownerDocument
+          var lRange = bdoc.createRange()
+          lRange.setStart(divParent, divParentOffSet)
+          lRange.setEndAfter(firstPNode)
+          var lCon = lRange.extractContents()
+          divParent.insertBefore(lCon,parentPNode)
+
+          // First P node of the line
+          fPrevNode = parentPNode.previousSibling
+          // Moving the middle copy/pasted content outside of parent 'p' tag
+          var innerEl = parentPNode.firstChild;
+          while(innerEl != lastPNode){
+            divParent.insertBefore(innerEl,parentPNode)
+            innerEl = parentPNode.firstChild
+          }
+          // Merging the first 'p' of copy/paste with the first 'p' of the line
+          firstPToRemove = fPrevNode.getElementsByTagName('P')
+          var innerEl;
+          while(innerEl=firstPToRemove[0].firstChild){
+            fPrevNode.insertBefore(innerEl,firstPToRemove[0])
+          }
+          fPrevNode.removeChild(firstPToRemove[0])
+          
+          // Merging the last 'p' of copy/paste with the last 'p' of the line 
+          lastPToRemove = parentPNode.getElementsByTagName('P')
+          var innerEl;
+          while(innerEl=lastPToRemove[0].firstChild){
+            parentPNode.insertBefore(innerEl,lastPToRemove[0])
+          }
+          parentPNode.removeChild(lastPToRemove[0]) 
+          // Cleanup the br tags from fPrevNode to parentPnode (since this is the end P node)
+
+          var currNode = fPrevNode;
+          var nextNode;
+          while((currNode !== null) && (currNode.previousSibling != parentPNode) ){
+            nextNode = currNode.nextSibling;
+            cleanUpBrTags(currNode);
+            currNode = nextNode;
+          }
+        }
+
+        // Removing br and replacing them with the the 'p' tags to maintain styling
+        function cleanUpBrTags(parentNode){
+          if(parentNode.nodeType === 3){
+            return;
+          }
+          var isPNode = (parentNode.nodeName === 'P')
+          if(isPNode){
+            //Split P node
+            brTags = parentNode.getElementsByTagName('BR')
+            while(brTags[0]){
+              // split the p node into two and delete the br tag
+              splitPNodesOnBr(parentNode, brTags[0])
+              brTags[0].parentNode.removeChild(brTags[0])              
+            }
+          }else{
+            // find previous p and put the contents from that to here in a new p tag
+            prevPNode = parentNode.previousSibling
+            while(prevPNode.nodeName != 'P'){
+              prevPNode = prevPNode.previousSibling
+            }
+
+            if (parentNode.nodeName === 'BR') {
+              brTag = parentNode
+            } else {
+              brTags = parentNode.getElementsByTagName('BR')
+              brTag = brTags[0]
+            }
+
+            while(brTag){
+              parent = prevPNode.parentNode
+              var doc = prevPNode.ownerDocument;
+              var leftRange = doc.createRange();
+              leftRange.setStartAfter(prevPNode);
+              leftRange.setEndBefore(brTag);
+              var newPNode = doc.createElement("p");
+              leftRange.surroundContents(newPNode);
+              brTag.parentNode.removeChild(brTag)
+            }
+          }
+        }
+
+        function splitPNodesOnBr(node,brNode){
+          parent = node.parentNode;
+          var parentOffset = getNodeIndex(parent,node);
+          var doc = brNode.ownerDocument;
+          var leftRange = doc.createRange();
+          leftRange.setStart(parent,parentOffset);
+          leftRange.setEndBefore(brNode);
+          var left = leftRange.extractContents();
+          parent.insertBefore(left,node);
+        }
+
+
+        function getNodeIndex(parent, node) {
+          var index = parent.childNodes.length;
+          while (index--) {
+            if (node === parent.childNodes[index]) {
+              break;
+            }
+          }
+          return index;
+        }
+      }catch(e){
+        
+      }
+
+      // Adding span's to all p's for normal text.
+
+      if(this.composer.element.id === "txtEditor"){
+
+        // Adding p's to any non p element.
+        divElem = this.composer.element;
+        childNodes = divElem.childNodes;
+        var k;
+        for(k=0; k < childNodes.length; k++){
+          if(childNodes[k].nodeName !== 'P'){
+            newPNode = this.composer.doc.createElement("P");
+            innerNode = childNodes[k];
+            newPNode.appendChild(innerNode);
+            if(childNodes[k+1]){
+              divElem.insertBefore(newPNode, childNodes[k+1]);
+            }else{
+              divElem.appendChild(newPNode);
+            }
+          }
+        }
+
+
+
+        getPElements = this.composer.element.getElementsByTagName("P")
+        var i;
+        for(i=0; i < getPElements.length; i++){
+          pNode = getPElements[i]
+          if(hasTextNodes(pNode)){
+            spNode = this.composer.doc.createElement("span");
+            spNode.className = "text-font-normal";
+            spNode.innerHTML = pNode.innerHTML;
+            pNode.innerHTML = "";
+            pNode.appendChild(spNode);
+          }
+        }
+      }
+
+      function hasTextNodes(pNode){
+        cNodes = pNode.childNodes;
+        var l;
+        for (l=0; l < cNodes.length; l++){
+          if(cNodes[l].nodeType === 3){
+            return true;
+          }
+        }
+        return false;
+      }
+
+      var after = false; // TO set the cursor after/before of the node
+      var cursorNode;
+
+      // Calculating the caret position based on this dummyNode.
+      dNode = document.getElementById('dummyNode');
+      if(dNode.nextSibling){
+        cursorNode = dNode.nextSibling;
+      }else{
+        cursorNode = dNode.parentNode;
+        after = true;
+      }
+
+      dNode.parentNode.removeChild(dNode);
+
+      if(after){
+        this.composer.selection.setAfter(cursorNode)
+      }else {
+        this.composer.selection.setBefore(cursorNode)
+      }
+      
+
+      //End of modification
     }
   });
+})(wysihtml);
+
+
+// Added : Manoj
+function capitalise(string){
+  if(string.length>0){
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  }else{
+    return string
+  }
+}
+wysihtml.commands.alignCenterStyle = (function() {
+  var nodeOptions = {
+    styleProperty: "textAlign",
+    styleValue: "center",
+    toggle: true
+  };
+  
+  return {
+    exec: function(composer, command) {
+      return wysihtml.commands.formatBlock.exec(composer, "formatBlock", nodeOptions);
+    },
+
+    state: function(composer, command) {
+      return wysihtml.commands.formatBlock.state(composer, "formatBlock", nodeOptions);
+    }
+  };
+})();
+  
+wysihtml.commands.alignJustifyStyle = (function() {
+  var nodeOptions = {
+    styleProperty: "textAlign",
+    styleValue: "justify",
+    toggle: true
+  };
+
+  return {
+    exec: function(composer, command) {
+      return wysihtml.commands.formatBlock.exec(composer, "formatBlock", nodeOptions);
+    },
+
+    state: function(composer, command) {
+      return wysihtml.commands.formatBlock.state(composer, "formatBlock", nodeOptions);
+    }
+  };
+})();
+
+wysihtml.commands.alignLeftStyle = (function() {
+  var nodeOptions = {
+    styleProperty: "textAlign",
+    styleValue: "left",
+    toggle: true
+  };
+
+  return {
+    exec: function(composer, command) {
+      return wysihtml.commands.formatBlock.exec(composer, "formatBlock", nodeOptions);
+    },
+
+    state: function(composer, command) {
+      return wysihtml.commands.formatBlock.state(composer, "formatBlock", nodeOptions);
+    }
+  };
+})();
+
+wysihtml.commands.alignRightStyle = (function() {
+  var nodeOptions = {
+    styleProperty: "textAlign",
+    styleValue: "right",
+    toggle: true
+  };
+
+  return {
+    exec: function(composer, command) {
+      return wysihtml.commands.formatBlock.exec(composer, "formatBlock", nodeOptions);
+    },
+
+    state: function(composer, command) {
+      return wysihtml.commands.formatBlock.state(composer, "formatBlock", nodeOptions);
+    }
+  };
+})();
+
+wysihtml.commands.justifyCenter = (function() {
+  var nodeOptions = {
+    className: "wysiwyg-text-align-center",
+    classRegExp: /wysiwyg-text-align-[0-9a-z]+/g,
+    toggle: true
+  };
+
+  return {
+    exec: function(composer, command) {
+      return wysihtml.commands.formatBlock.exec(composer, "formatBlock", nodeOptions);
+    },
+
+    state: function(composer, command) {
+      return wysihtml.commands.formatBlock.state(composer, "formatBlock", nodeOptions);
+    }
+  };
+  
+})();
+
+wysihtml.commands.justifyFull = (function() {
+  var nodeOptions = {
+    className: "wysiwyg-text-align-justify",
+    classRegExp: /wysiwyg-text-align-[0-9a-z]+/g,
+    toggle: true
+  };
+
+  return {
+    exec: function(composer, command) {
+      return wysihtml.commands.formatBlock.exec(composer, "formatBlock", nodeOptions);
+    },
+
+    state: function(composer, command) {
+      return wysihtml.commands.formatBlock.state(composer, "formatBlock", nodeOptions);
+    }
+  };
+})();
+
+wysihtml.commands.justifyLeft = (function() {
+  var nodeOptions = {
+    className: "wysiwyg-text-align-left",
+    classRegExp: /wysiwyg-text-align-[0-9a-z]+/g,
+    toggle: true
+  };
+
+  return {
+    exec: function(composer, command) {
+      return wysihtml.commands.formatBlock.exec(composer, "formatBlock", nodeOptions);
+    },
+
+    state: function(composer, command) {
+      return wysihtml.commands.formatBlock.state(composer, "formatBlock", nodeOptions);
+    }
+  };
+})();
+
+wysihtml.commands.justifyRight = (function() {
+  var nodeOptions = {
+    className: "wysiwyg-text-align-right",
+    classRegExp: /wysiwyg-text-align-[0-9a-z]+/g,
+    toggle: true
+  };
+
+  return {
+    exec: function(composer, command) {
+      return wysihtml.commands.formatBlock.exec(composer, "formatBlock", nodeOptions);
+    },
+
+    state: function(composer, command) {
+      return wysihtml.commands.formatBlock.state(composer, "formatBlock", nodeOptions);
+    }
+  };
+})();
+/* Sets text background color by inline styles */
+wysihtml.commands.bgColorStyle = (function() {
+  return {
+    exec: function(composer, command, color) {
+      var colorVals  = wysihtml.quirks.styleParser.parseColor("background-color:" + (color.color || color), "background-color"),
+          colString;
+
+      if (colorVals) {
+        colString = (colorVals[3] === 1 ? "rgb(" + [colorVals[0], colorVals[1], colorVals[2]].join(', ') : "rgba(" + colorVals.join(', ')) + ')';
+        wysihtml.commands.formatInline.exec(composer, command, {styleProperty: 'backgroundColor', styleValue: colString});
+      }
+    },
+
+    state: function(composer, command, color) {
+      var colorVals  = color ? wysihtml.quirks.styleParser.parseColor("background-color:" + (color.color || color), "background-color") : null,
+          colString;
+
+      if (colorVals) {
+        colString = (colorVals[3] === 1 ? "rgb(" + [colorVals[0], colorVals[1], colorVals[2]].join(', ') : "rgba(" + colorVals.join(', ')) + ')';
+      }
+
+      return wysihtml.commands.formatInline.state(composer, command, {styleProperty: 'backgroundColor', styleValue: colString});
+    },
+
+    remove: function(composer, command) {
+      return wysihtml.commands.formatInline.remove(composer, command, {styleProperty: 'backgroundColor'});
+    },
+
+    stateValue: function(composer, command, props) {
+      var st = this.state(composer, command),
+          colorStr,
+          val = false;
+
+      if (st && wysihtml.lang.object(st).isArray()) {
+        st = st[0];
+      }
+
+      if (st) {
+        colorStr = st.getAttribute('style');
+        if (colorStr) {
+          val = wysihtml.quirks.styleParser.parseColor(colorStr, "background-color");
+          return wysihtml.quirks.styleParser.unparseColor(val, props);
+        }
+      }
+      return false;
+    }
+  };
+})();
+
+wysihtml.commands.foreColor = (function() {
+  var REG_EXP = /wysiwyg-color-[0-9a-z]+/g;
+
+  return {
+    exec: function(composer, command, color) {
+      wysihtml.commands.formatInline.exec(composer, command, {className: "wysiwyg-color-" + color, classRegExp: REG_EXP, toggle: true});
+    },
+
+    state: function(composer, command, color) {
+      return wysihtml.commands.formatInline.state(composer, command, {className: "wysiwyg-color-" + color});
+    }
+  };
+})();
+
+/* Sets text color by inline styles */
+wysihtml.commands.foreColorStyle = (function() {
+  return {
+    exec: function(composer, command, color) {
+      var colorVals, colString;
+
+      if (!color) { return; }
+
+      colorVals = wysihtml.quirks.styleParser.parseColor("color:" + (color.color || color), "color");
+
+      if (colorVals) {
+        colString = (colorVals[3] === 1 ? "rgb(" + [colorVals[0], colorVals[1], colorVals[2]].join(", ") : "rgba(" + colorVals.join(', ')) + ')';
+        wysihtml.commands.formatInline.exec(composer, command, {styleProperty: "color", styleValue: colString});
+      }
+    },
+
+    state: function(composer, command, color) {
+      var colorVals  = color ? wysihtml.quirks.styleParser.parseColor("color:" + (color.color || color), "color") : null,
+          colString;
+
+
+      if (colorVals) {
+        colString = (colorVals[3] === 1 ? "rgb(" + [colorVals[0], colorVals[1], colorVals[2]].join(", ") : "rgba(" + colorVals.join(', ')) + ')';
+      }
+
+      return wysihtml.commands.formatInline.state(composer, command, {styleProperty: "color", styleValue: colString});
+    },
+
+    remove: function(composer, command) {
+      return wysihtml.commands.formatInline.remove(composer, command, {styleProperty: "color"});
+    },
+
+    stateValue: function(composer, command, props) {
+      var st = this.state(composer, command),
+          colorStr,
+          val = false;
+
+      if (st && wysihtml.lang.object(st).isArray()) {
+        st = st[0];
+      }
+
+      if (st) {
+        colorStr = st.getAttribute("style");
+        if (colorStr) {
+          val = wysihtml.quirks.styleParser.parseColor(colorStr, "color");
+          return wysihtml.quirks.styleParser.unparseColor(val, props);
+        }
+      }
+      return false;
+    }
+  };
+})();
+wysihtml.commands.bold = (function() {
+    var nodeOptions = {
+        nodeName: "B",
+        toggle: true
+    };
+
+    return {
+        exec: function(composer, command) {
+            wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+        },
+
+        state: function(composer, command) {
+            return wysihtml.commands.formatInline.state(composer, command, nodeOptions);
+        }
+    };
+})();
+
+wysihtml.commands.fontSize = (function() {
+    var REG_EXP = /text-font-[0-9a-z\-]+/g;
+  
+    return {
+        exec: function(composer, command, size) {
+            wysihtml.commands.formatInline.exec(composer, command, {className: "text-font-" + size, classRegExp: REG_EXP, toggle: true});
+        },
+
+        state: function(composer, command, size) {
+            var data = wysihtml.commands.formatInline.state(composer, command, {className: "text-font-" + size});
+            if(data){
+                $('.current-font').text(capitalise(data[0].className.replace("text-font-","")));
+            }
+            return data;
+        }
+    };
+})();
+
+
+/* Set font size by inline style */
+wysihtml.commands.fontSizeStyle = (function() {
+    return {
+        exec: function(composer, command, size) {
+            size = size.size || size;
+            if (!(/^\s*$/).test(size)) {
+                wysihtml.commands.formatInline.exec(composer, command, {styleProperty: "fontSize", styleValue: size, toggle: false});
+            }
+        },
+
+        state: function(composer, command, size) {
+            return wysihtml.commands.formatInline.state(composer, command, {styleProperty: "fontSize", styleValue: size || undefined});
+        },
+
+        remove: function(composer, command) {
+            return wysihtml.commands.formatInline.remove(composer, command, {styleProperty: "fontSize"});
+        },
+
+        stateValue: function(composer, command) {
+            var styleStr,
+                st = this.state(composer, command);
+
+            if (st && wysihtml.lang.object(st).isArray()) {
+                st = st[0];
+            }
+            if (st) {
+                styleStr = st.getAttribute("style");
+                if (styleStr) {
+                return wysihtml.quirks.styleParser.parseFontSize(styleStr);
+                }
+            }
+            return false;
+        }
+    };
+})();
+
+wysihtml.commands.italic = (function() { 
+    var nodeOptions = {
+        nodeName: "I",
+        toggle: true
+    };
+
+    return {
+        exec: function(composer, command) {
+            wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+        },
+
+        state: function(composer, command) {
+            return wysihtml.commands.formatInline.state(composer, command, nodeOptions);
+        }
+    };
+
+})();
+
+/* Formats block for as a <pre><code class="classname"></code></pre> block
+ * Useful in conjuction for sytax highlight utility: highlight.js
+ *
+ * Usage:
+ *
+ * editorInstance.composer.commands.exec("formatCode", "language-html");
+*/
+wysihtml.commands.formatCode = (function() {
+    return {
+        exec: function(composer, command, classname) {
+            var pre = this.state(composer)[0],
+                code, range, selectedNodes;
+
+            if (pre) {
+                // caret is already within a <pre><code>...</code></pre>
+                composer.selection.executeAndRestore(function() {
+                    code = pre.querySelector("code");
+                    wysihtml.dom.replaceWithChildNodes(pre);
+                    if (code) {
+                        wysihtml.dom.replaceWithChildNodes(code);
+                    }
+                });
+            } else {
+                // Wrap in <pre><code>...</code></pre>
+                range = composer.selection.getRange();
+                selectedNodes = range.extractContents();
+                pre = composer.doc.createElement("pre");
+                code = composer.doc.createElement("code");
+
+                if (classname) {
+                    code.className = classname;
+                }
+
+                pre.appendChild(code);
+                code.appendChild(selectedNodes);
+                range.insertNode(pre);
+                composer.selection.selectNode(pre);
+            }
+        },
+
+        state: function(composer) {
+            var selectedNode = composer.selection.getSelectedNode(), node;
+            if (selectedNode && selectedNode.nodeName && selectedNode.nodeName == "PRE"&&
+                selectedNode.firstChild && selectedNode.firstChild.nodeName && selectedNode.firstChild.nodeName == "CODE") {
+                return [selectedNode];
+            } else {
+                node = wysihtml.dom.getParentElement(selectedNode, { query: "pre code" });
+                return node ? [node.parentNode] : false;
+            }
+        }
+    };
+})();
+/**
+ * Inserts an <img>
+ * If selection is already an image link, it removes it
+ *
+ * @example
+ *    // either ...
+ *    wysihtml.commands.insertImage.exec(composer, "insertImage", "http://www.google.de/logo.jpg");
+ *    // ... or ...
+ *    wysihtml.commands.insertImage.exec(composer, "insertImage", { src: "http://www.google.de/logo.jpg", title: "foo" });
+ */
+wysihtml.commands.insertImage = (function() {
+    var NODE_NAME = "IMG";
+    return {
+        exec: function(composer, command, value) {
+            value = typeof(value) === "object" ? value : { src: value };
+
+            var doc     = composer.doc,
+                image   = this.state(composer),
+                textNode,
+                parent;
+
+            // If image is selected and src ie empty, set the caret before it and delete the image
+            if (image && !value.src) {
+                composer.selection.setBefore(image);
+                parent = image.parentNode;
+                parent.removeChild(image);
+
+                // and it's parent <a> too if it hasn't got any other relevant child nodes
+                wysihtml.dom.removeEmptyTextNodes(parent);
+                if (parent.nodeName === "A" && !parent.firstChild) {
+                composer.selection.setAfter(parent);
+                parent.parentNode.removeChild(parent);
+                }
+
+                // firefox and ie sometimes don't remove the image handles, even though the image got removed
+                wysihtml.quirks.redraw(composer.element);
+                return;
+            }
+
+            // If image selected change attributes accordingly
+            if (image) {
+                for (var key in value) {
+                    if (value.hasOwnProperty(key)) {
+                        image.setAttribute(key === "className" ? "class" : key, value[key]);
+                    }
+                }
+                return;
+            }
+
+            // Otherwise lets create the image
+            image = doc.createElement(NODE_NAME);
+
+            for (var i in value) {
+                image.setAttribute(i === "className" ? "class" : i, value[i]);
+            }
+
+            composer.selection.insertNode(image);
+            if (wysihtml.browser.hasProblemsSettingCaretAfterImg()) {
+                textNode = doc.createTextNode(wysihtml.INVISIBLE_SPACE);
+                composer.selection.insertNode(textNode);
+                composer.selection.setAfter(textNode);
+            } else {
+                composer.selection.setAfter(image);
+            }
+        },
+
+        state: function(composer) {
+            var doc = composer.doc,
+                selectedNode,
+                text,
+                imagesInSelection;
+
+            if (!wysihtml.dom.hasElementWithTagName(doc, NODE_NAME)) {
+                return false;
+            }
+
+            selectedNode = composer.selection.getSelectedNode();
+            if (!selectedNode) {
+                return false;
+            }
+
+            if (selectedNode.nodeName === NODE_NAME) {
+                // This works perfectly in IE
+                return selectedNode;
+            }
+
+            if (selectedNode.nodeType !== wysihtml.ELEMENT_NODE) {
+                return false;
+            }
+
+            text = composer.selection.getText();
+            text = wysihtml.lang.string(text).trim();
+            if (text) {
+                return false;
+            }
+
+            imagesInSelection = composer.selection.getNodes(wysihtml.ELEMENT_NODE, function(node) {
+                return node.nodeName === "IMG";
+            });
+
+            if (imagesInSelection.length !== 1) {
+                return false;
+            }
+
+            return imagesInSelection[0];
+        }
+    };
+})();
+
+wysihtml.commands.insertBlockQuote = (function() {
+    var nodeOptions = {
+        nodeName: "BLOCKQUOTE",
+        toggle: true
+    };
+
+    return {
+        exec: function(composer, command) {
+            return wysihtml.commands.formatBlock.exec(composer, "formatBlock", nodeOptions);
+        },
+
+        state: function(composer, command) {
+            return wysihtml.commands.formatBlock.state(composer, "formatBlock", nodeOptions);
+        }
+    };
+})();
+
+wysihtml.commands.insertHorizontalRule = (function() {
+    return {
+        exec: function(composer) {
+            var node = composer.selection.getSelectedNode(),
+                phrasingOnlyParent = wysihtml.dom.getParentElement(node, { query: wysihtml.PERMITTED_PHRASING_CONTENT_ONLY }, null, composer.editableArea),
+                elem = document.createElement('hr'),
+                range, idx;
+
+            // HR is not allowed into some elements (where only phrasing content is allowed)
+            // thus the HR insertion must break out of those https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/Content_categories
+            if (phrasingOnlyParent) {
+                composer.selection.splitElementAtCaret(phrasingOnlyParent, elem);
+            } else {
+                composer.selection.insertNode(elem);
+            }
+
+            if (elem.nextSibling) {
+                composer.selection.setBefore(elem.nextSibling);
+            } else {
+                composer.selection.setAfter(elem);
+            }
+        },
+        state: function() {
+            return false; // :(
+        }
+    };
+})();
+
+wysihtml.commands.insertOrderedList = (function() {
+return {
+    exec: function(composer, command) {
+    wysihtml.commands.insertList.exec(composer, command, "OL");
+    },
+
+    state: function(composer, command) {
+    return wysihtml.commands.insertList.state(composer, command, "OL");
+    }
+};
+})();
+
+wysihtml.commands.insertUnorderedList = (function() {
+return {
+    exec: function(composer, command) {
+    wysihtml.commands.insertList.exec(composer, command, "UL");
+    },
+
+    state: function(composer, command) {
+    return wysihtml.commands.insertList.state(composer, command, "UL");
+    }
+};
+})();
+
+wysihtml.commands.addTableCells = {
+    exec: function(composer, command, value) {
+        if (composer.tableSelection && composer.tableSelection.start && composer.tableSelection.end) {
+            // switches start and end if start is bigger than end (reverse selection)
+            var tableSelect = wysihtml.dom.table.orderSelectionEnds(composer.tableSelection.start, composer.tableSelection.end);
+            if (value == 'before' || value == 'above') {
+                wysihtml.dom.table.addCells(tableSelect.start, value);
+            } else if (value == 'after' || value == 'below') {
+                wysihtml.dom.table.addCells(tableSelect.end, value);
+            }
+            setTimeout(function() {
+                composer.tableSelection.select(tableSelect.start, tableSelect.end);
+            },0);
+        }
+    },
+
+    state: function(composer, command) {
+        return false;
+    }
+};
+
+wysihtml.commands.createTable = {
+    exec: function(composer, command, value) {
+        var col, row, html;
+        if (value && value.cols && value.rows && parseInt(value.cols, 10) > 0 && parseInt(value.rows, 10) > 0) {
+            if (value.tableStyle) {
+                html = '<table style="' + value.tableStyle + '">';
+            } else {
+                html = '<table>';
+            }
+            html += '<tbody>';
+            for (row = 0; row < value.rows; row ++) {
+                html += '<tr>';
+                for (col = 0; col < value.cols; col ++) {
+                    html += '<td><br></td>';
+                }
+                html += '</tr>';
+            }
+            html += '</tbody></table>';
+            composer.commands.exec('insertHTML', html);
+        }
+    },
+
+    state: function(composer, command) {
+        return false;
+    }
+};
+
+wysihtml.commands.deleteTableCells = {
+    exec: function(composer, command, value) {
+        if (composer.tableSelection && composer.tableSelection.start && composer.tableSelection.end) {
+            var tableSelect = wysihtml.dom.table.orderSelectionEnds(composer.tableSelection.start, composer.tableSelection.end),
+                idx = wysihtml.dom.table.indexOf(tableSelect.start),
+                selCell,
+                table = composer.tableSelection.table;
+
+            wysihtml.dom.table.removeCells(tableSelect.start, value);
+            setTimeout(function() {
+                // move selection to next or previous if not present
+                selCell = wysihtml.dom.table.findCell(table, idx);
+
+                if (!selCell) {
+                    if (value == 'row') {
+                        selCell = wysihtml.dom.table.findCell(table, {
+                            'row': idx.row - 1,
+                            'col': idx.col
+                        });
+                    }
+
+                    if (value == 'column') {
+                        selCell = wysihtml.dom.table.findCell(table, {
+                            'row': idx.row,
+                            'col': idx.col - 1
+                        });
+                    }
+                }
+                if (selCell) {
+                    composer.tableSelection.select(selCell, selCell);
+                }
+            }, 0);
+        }
+    },
+    state: function(composer, command) {
+        return false;
+    }
+};
+
+wysihtml.commands.mergeTableCells = {
+    exec: function(composer, command) {
+        if (composer.tableSelection && composer.tableSelection.start && composer.tableSelection.end) {
+        if (this.state(composer, command)) {
+            wysihtml.dom.table.unmergeCell(composer.tableSelection.start);
+        } else {
+            wysihtml.dom.table.mergeCellsBetween(composer.tableSelection.start, composer.tableSelection.end);
+        }
+        }
+    },
+
+    state: function(composer, command) {
+        if (composer.tableSelection) {
+            var start = composer.tableSelection.start,
+                end = composer.tableSelection.end;
+            if (start && end && start == end &&
+                ((
+                wysihtml.dom.getAttribute(start, 'colspan') &&
+                parseInt(wysihtml.dom.getAttribute(start, 'colspan'), 10) > 1
+                ) || (
+                wysihtml.dom.getAttribute(start, 'rowspan') &&
+                parseInt(wysihtml.dom.getAttribute(start, 'rowspan'), 10) > 1
+                ))
+            ) {
+                return [start];
+            }
+        }
+        return false;
+    }
+};
+wysihtml.commands.subscript = (function() {
+    var nodeOptions = {
+        nodeName: "SUB",
+        toggle: true
+    };
+
+    return {
+        exec: function(composer, command) {
+            wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+        },
+
+        state: function(composer, command) {
+            return wysihtml.commands.formatInline.state(composer, command, nodeOptions);
+        }
+    };
+
+})();
+
+wysihtml.commands.superscript = (function() {
+    var nodeOptions = {
+        nodeName: "SUP",
+        toggle: true
+    };
+
+    return {
+        exec: function(composer, command) {
+            wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+        },
+
+        state: function(composer, command) {
+            return wysihtml.commands.formatInline.state(composer, command, nodeOptions);
+        }
+    };
+
+})();
+
+wysihtml.commands.underline = (function() {
+    var nodeOptions = {
+        nodeName: "U",
+        toggle: true
+    };
+
+    return {
+        exec: function(composer, command) {
+            wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+        },
+
+        state: function(composer, command) {
+            return wysihtml.commands.formatInline.state(composer, command, nodeOptions);
+        }
+    };
+
+})();
+(function() {
+
+  var api = wysihtml.dom;
+
+  var MapCell = function(cell) {
+    this.el = cell;
+    this.isColspan= false;
+    this.isRowspan= false;
+    this.firstCol= true;
+    this.lastCol= true;
+    this.firstRow= true;
+    this.lastRow= true;
+    this.isReal= true;
+    this.spanCollection= [];
+    this.modified = false;
+  };
+
+  var TableModifyerByCell = function (cell, table) {
+    if (cell) {
+      this.cell = cell;
+      this.table = api.getParentElement(cell, { query: "table" });
+    } else if (table) {
+      this.table = table;
+      this.cell = this.table.querySelectorAll('th, td')[0];
+    }
+  };
+
+  function queryInList(list, query) {
+    var ret = [],
+      q;
+    for (var e = 0, len = list.length; e < len; e++) {
+      q = list[e].querySelectorAll(query);
+      if (q) {
+        for(var i = q.length; i--; ret.unshift(q[i]));
+      }
+    }
+    return ret;
+  }
+
+  function removeElement(el) {
+    el.parentNode.removeChild(el);
+  }
+
+  function insertAfter(referenceNode, newNode) {
+    referenceNode.parentNode.insertBefore(newNode, referenceNode.nextSibling);
+  }
+
+  function nextNode(node, tag) {
+    var element = node.nextSibling;
+    while (element.nodeType !=1) {
+      element = element.nextSibling;
+      if (!tag || tag == element.tagName.toLowerCase()) {
+        return element;
+      }
+    }
+    return null;
+  }
+
+  TableModifyerByCell.prototype = {
+
+    addSpannedCellToMap: function(cell, map, r, c, cspan, rspan) {
+      var spanCollect = [],
+        rmax = r + ((rspan) ? parseInt(rspan, 10) - 1 : 0),
+        cmax = c + ((cspan) ? parseInt(cspan, 10) - 1 : 0);
+
+      for (var rr = r; rr <= rmax; rr++) {
+        if (typeof map[rr] == "undefined") { map[rr] = []; }
+        for (var cc = c; cc <= cmax; cc++) {
+          map[rr][cc] = new MapCell(cell);
+          map[rr][cc].isColspan = (cspan && parseInt(cspan, 10) > 1);
+          map[rr][cc].isRowspan = (rspan && parseInt(rspan, 10) > 1);
+          map[rr][cc].firstCol = cc == c;
+          map[rr][cc].lastCol = cc == cmax;
+          map[rr][cc].firstRow = rr == r;
+          map[rr][cc].lastRow = rr == rmax;
+          map[rr][cc].isReal = cc == c && rr == r;
+          map[rr][cc].spanCollection = spanCollect;
+
+          spanCollect.push(map[rr][cc]);
+        }
+      }
+    },
+
+    setCellAsModified: function(cell) {
+      cell.modified = true;
+      if (cell.spanCollection.length > 0) {
+        for (var s = 0, smax = cell.spanCollection.length; s < smax; s++) {
+        cell.spanCollection[s].modified = true;
+        }
+      }
+    },
+
+    setTableMap: function() {
+      var map = [];
+      var tableRows = this.getTableRows(),
+        ridx, row, cells, cidx, cell,
+        c,
+        cspan, rspan;
+
+      for (ridx = 0; ridx < tableRows.length; ridx++) {
+        row = tableRows[ridx];
+        cells = this.getRowCells(row);
+        c = 0;
+        if (typeof map[ridx] == "undefined") { map[ridx] = []; }
+        for (cidx = 0; cidx < cells.length; cidx++) {
+          cell = cells[cidx];
+
+          // If cell allready set means it is set by col or rowspan,
+          // so increase cols index until free col is found
+          while (typeof map[ridx][c] != "undefined") { c++; }
+
+          cspan = api.getAttribute(cell, 'colspan');
+          rspan = api.getAttribute(cell, 'rowspan');
+
+          if (cspan || rspan) {
+            this.addSpannedCellToMap(cell, map, ridx, c, cspan, rspan);
+            c = c + ((cspan) ? parseInt(cspan, 10) : 1);
+          } else {
+            map[ridx][c] = new MapCell(cell);
+            c++;
+          }
+        }
+      }
+      this.map = map;
+      return map;
+    },
+
+    getRowCells: function(row) {
+      var inlineTables = this.table.querySelectorAll('table'),
+        inlineCells = (inlineTables) ? queryInList(inlineTables, 'th, td') : [],
+        allCells = row.querySelectorAll('th, td'),
+        tableCells = (inlineCells.length > 0) ? wysihtml.lang.array(allCells).without(inlineCells) : allCells;
+
+      return tableCells;
+    },
+
+    getTableRows: function() {
+      var inlineTables = this.table.querySelectorAll('table'),
+        inlineRows = (inlineTables) ? queryInList(inlineTables, 'tr') : [],
+        allRows = this.table.querySelectorAll('tr'),
+        tableRows = (inlineRows.length > 0) ? wysihtml.lang.array(allRows).without(inlineRows) : allRows;
+
+      return tableRows;
+    },
+
+    getMapIndex: function(cell) {
+      var r_length = this.map.length,
+        c_length = (this.map && this.map[0]) ? this.map[0].length : 0;
+
+      for (var r_idx = 0;r_idx < r_length; r_idx++) {
+        for (var c_idx = 0;c_idx < c_length; c_idx++) {
+          if (this.map[r_idx][c_idx].el === cell) {
+            return {'row': r_idx, 'col': c_idx};
+          }
+        }
+      }
+      return false;
+    },
+
+    getElementAtIndex: function(idx) {
+      this.setTableMap();
+      if (this.map[idx.row] && this.map[idx.row][idx.col] && this.map[idx.row][idx.col].el) {
+        return this.map[idx.row][idx.col].el;
+      }
+      return null;
+    },
+
+    getMapElsTo: function(to_cell) {
+      var els = [];
+      this.setTableMap();
+      this.idx_start = this.getMapIndex(this.cell);
+      this.idx_end = this.getMapIndex(to_cell);
+
+      // switch indexes if start is bigger than end
+      if (this.idx_start.row > this.idx_end.row || (this.idx_start.row == this.idx_end.row && this.idx_start.col > this.idx_end.col)) {
+        var temp_idx = this.idx_start;
+        this.idx_start = this.idx_end;
+        this.idx_end = temp_idx;
+      }
+      if (this.idx_start.col > this.idx_end.col) {
+        var temp_cidx = this.idx_start.col;
+        this.idx_start.col = this.idx_end.col;
+        this.idx_end.col = temp_cidx;
+      }
+
+      if (this.idx_start != null && this.idx_end != null) {
+        for (var row = this.idx_start.row, maxr = this.idx_end.row; row <= maxr; row++) {
+          for (var col = this.idx_start.col, maxc = this.idx_end.col; col <= maxc; col++) {
+            els.push(this.map[row][col].el);
+          }
+        }
+      }
+      return els;
+    },
+
+    orderSelectionEnds: function(secondcell) {
+      this.setTableMap();
+      this.idx_start = this.getMapIndex(this.cell);
+      this.idx_end = this.getMapIndex(secondcell);
+
+      // switch indexes if start is bigger than end
+      if (this.idx_start.row > this.idx_end.row || (this.idx_start.row == this.idx_end.row && this.idx_start.col > this.idx_end.col)) {
+        var temp_idx = this.idx_start;
+        this.idx_start = this.idx_end;
+        this.idx_end = temp_idx;
+      }
+      if (this.idx_start.col > this.idx_end.col) {
+        var temp_cidx = this.idx_start.col;
+        this.idx_start.col = this.idx_end.col;
+        this.idx_end.col = temp_cidx;
+      }
+
+      return {
+        "start": this.map[this.idx_start.row][this.idx_start.col].el,
+        "end": this.map[this.idx_end.row][this.idx_end.col].el
+      };
+    },
+
+    createCells: function(tag, nr, attrs) {
+      var doc = this.table.ownerDocument,
+        frag = doc.createDocumentFragment(),
+        cell;
+      for (var i = 0; i < nr; i++) {
+        cell = doc.createElement(tag);
+
+        if (attrs) {
+          for (var attr in attrs) {
+            if (attrs.hasOwnProperty(attr)) {
+              cell.setAttribute(attr, attrs[attr]);
+            }
+          }
+        }
+
+        // add non breaking space
+        cell.appendChild(document.createTextNode("\u00a0"));
+        frag.appendChild(cell);
+      }
+      return frag;
+    },
+
+    // Returns next real cell (not part of spanned cell unless first) on row if selected index is not real. I no real cells -1 will be returned
+    correctColIndexForUnreals: function(col, row) {
+      var r = this.map[row],
+        corrIdx = -1;
+      for (var i = 0, max = col; i < col; i++) {
+        if (r[i].isReal){
+          corrIdx++;
+        }
+      }
+      return corrIdx;
+    },
+
+    getLastNewCellOnRow: function(row, rowLimit) {
+      var cells = this.getRowCells(row),
+        cell, idx;
+
+      for (var cidx = 0, cmax = cells.length; cidx < cmax; cidx++) {
+        cell = cells[cidx];
+        idx = this.getMapIndex(cell);
+        if (idx === false || (typeof rowLimit != "undefined" && idx.row != rowLimit)) {
+          return cell;
+        }
+      }
+      return null;
+    },
+
+    removeEmptyTable: function() {
+      var cells = this.table.querySelectorAll('td, th');
+      if (!cells || cells.length == 0) {
+        removeElement(this.table);
+        return true;
+      } else {
+        return false;
+      }
+    },
+
+    // Splits merged cell on row to unique cells
+    splitRowToCells: function(cell) {
+      if (cell.isColspan) {
+        var colspan = parseInt(api.getAttribute(cell.el, 'colspan') || 1, 10),
+          cType = cell.el.tagName.toLowerCase();
+        if (colspan > 1) {
+          var newCells = this.createCells(cType, colspan -1);
+          insertAfter(cell.el, newCells);
+        }
+        cell.el.removeAttribute('colspan');
+      }
+    },
+
+    getRealRowEl: function(force, idx) {
+      var r = null,
+        c = null;
+
+      idx = idx || this.idx;
+
+      for (var cidx = 0, cmax = this.map[idx.row].length; cidx < cmax; cidx++) {
+        c = this.map[idx.row][cidx];
+        if (c.isReal) {
+          r = api.getParentElement(c.el, { query: "tr" });
+          if (r) {
+            return r;
+          }
+        }
+      }
+
+      if (r === null && force) {
+        r = api.getParentElement(this.map[idx.row][idx.col].el, { query: "tr" }) || null;
+      }
+
+      return r;
+    },
+
+    injectRowAt: function(row, col, colspan, cType, c) {
+      var r = this.getRealRowEl(false, {'row': row, 'col': col}),
+        new_cells = this.createCells(cType, colspan);
+
+      if (r) {
+        var n_cidx = this.correctColIndexForUnreals(col, row);
+        if (n_cidx >= 0) {
+          insertAfter(this.getRowCells(r)[n_cidx], new_cells);
+        } else {
+          r.insertBefore(new_cells, r.firstChild);
+        }
+      } else {
+        var rr = this.table.ownerDocument.createElement('tr');
+        rr.appendChild(new_cells);
+        insertAfter(api.getParentElement(c.el, { query: "tr" }), rr);
+      }
+    },
+
+    canMerge: function(to) {
+      this.to = to;
+      this.setTableMap();
+      this.idx_start = this.getMapIndex(this.cell);
+      this.idx_end = this.getMapIndex(this.to);
+
+      // switch indexes if start is bigger than end
+      if (this.idx_start.row > this.idx_end.row || (this.idx_start.row == this.idx_end.row && this.idx_start.col > this.idx_end.col)) {
+        var temp_idx = this.idx_start;
+        this.idx_start = this.idx_end;
+        this.idx_end = temp_idx;
+      }
+      if (this.idx_start.col > this.idx_end.col) {
+        var temp_cidx = this.idx_start.col;
+        this.idx_start.col = this.idx_end.col;
+        this.idx_end.col = temp_cidx;
+      }
+
+      for (var row = this.idx_start.row, maxr = this.idx_end.row; row <= maxr; row++) {
+        for (var col = this.idx_start.col, maxc = this.idx_end.col; col <= maxc; col++) {
+          if (this.map[row][col].isColspan || this.map[row][col].isRowspan) {
+            return false;
+          }
+        }
+      }
+      return true;
+    },
+
+    decreaseCellSpan: function(cell, span) {
+      var nr = parseInt(api.getAttribute(cell.el, span), 10) - 1;
+      if (nr >= 1) {
+        cell.el.setAttribute(span, nr);
+      } else {
+        cell.el.removeAttribute(span);
+        if (span == 'colspan') {
+          cell.isColspan = false;
+        }
+        if (span == 'rowspan') {
+          cell.isRowspan = false;
+        }
+        cell.firstCol = true;
+        cell.lastCol = true;
+        cell.firstRow = true;
+        cell.lastRow = true;
+        cell.isReal = true;
+      }
+    },
+
+    removeSurplusLines: function() {
+      var row, cell, ridx, rmax, cidx, cmax, allRowspan;
+
+      this.setTableMap();
+      if (this.map) {
+        ridx = 0;
+        rmax = this.map.length;
+        for (;ridx < rmax; ridx++) {
+          row = this.map[ridx];
+          allRowspan = true;
+          cidx = 0;
+          cmax = row.length;
+          for (; cidx < cmax; cidx++) {
+            cell = row[cidx];
+            if (!(api.getAttribute(cell.el, "rowspan") && parseInt(api.getAttribute(cell.el, "rowspan"), 10) > 1 && cell.firstRow !== true)) {
+              allRowspan = false;
+              break;
+            }
+          }
+          if (allRowspan) {
+            cidx = 0;
+            for (; cidx < cmax; cidx++) {
+              this.decreaseCellSpan(row[cidx], 'rowspan');
+            }
+          }
+        }
+
+        // remove rows without cells
+        var tableRows = this.getTableRows();
+        ridx = 0;
+        rmax = tableRows.length;
+        for (;ridx < rmax; ridx++) {
+          row = tableRows[ridx];
+          if (row.childNodes.length == 0 && (/^\s*$/.test(row.textContent || row.innerText))) {
+            removeElement(row);
+          }
+        }
+      }
+    },
+
+    fillMissingCells: function() {
+      var r_max = 0,
+        c_max = 0,
+        prevcell = null;
+
+      this.setTableMap();
+      if (this.map) {
+
+        // find maximal dimensions of broken table
+        r_max = this.map.length;
+        for (var ridx = 0; ridx < r_max; ridx++) {
+          if (this.map[ridx].length > c_max) { c_max = this.map[ridx].length; }
+        }
+
+        for (var row = 0; row < r_max; row++) {
+          for (var col = 0; col < c_max; col++) {
+            if (this.map[row] && !this.map[row][col]) {
+              if (col > 0) {
+                this.map[row][col] = new MapCell(this.createCells('td', 1));
+                prevcell = this.map[row][col-1];
+                if (prevcell && prevcell.el && prevcell.el.parent) { // if parent does not exist element is removed from dom
+                  insertAfter(this.map[row][col-1].el, this.map[row][col].el);
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    rectify: function() {
+      if (!this.removeEmptyTable()) {
+        this.removeSurplusLines();
+        this.fillMissingCells();
+        return true;
+      } else {
+        return false;
+      }
+    },
+
+    unmerge: function() {
+      if (this.rectify()) {
+        this.setTableMap();
+        this.idx = this.getMapIndex(this.cell);
+
+        if (this.idx) {
+          var thisCell = this.map[this.idx.row][this.idx.col],
+            colspan = (api.getAttribute(thisCell.el, "colspan")) ? parseInt(api.getAttribute(thisCell.el, "colspan"), 10) : 1,
+            cType = thisCell.el.tagName.toLowerCase();
+
+          if (thisCell.isRowspan) {
+            var rowspan = parseInt(api.getAttribute(thisCell.el, "rowspan"), 10);
+            if (rowspan > 1) {
+              for (var nr = 1, maxr = rowspan - 1; nr <= maxr; nr++){
+                this.injectRowAt(this.idx.row + nr, this.idx.col, colspan, cType, thisCell);
+              }
+            }
+            thisCell.el.removeAttribute('rowspan');
+          }
+          this.splitRowToCells(thisCell);
+        }
+      }
+    },
+
+    // merges cells from start cell (defined in creating obj) to "to" cell
+    merge: function(to) {
+      if (this.rectify()) {
+        if (this.canMerge(to)) {
+          var rowspan = this.idx_end.row - this.idx_start.row + 1,
+            colspan = this.idx_end.col - this.idx_start.col + 1;
+
+          for (var row = this.idx_start.row, maxr = this.idx_end.row; row <= maxr; row++) {
+            for (var col = this.idx_start.col, maxc = this.idx_end.col; col <= maxc; col++) {
+
+              if (row == this.idx_start.row && col == this.idx_start.col) {
+                if (rowspan > 1) {
+                  this.map[row][col].el.setAttribute('rowspan', rowspan);
+                }
+                if (colspan > 1) {
+                  this.map[row][col].el.setAttribute('colspan', colspan);
+                }
+              } else {
+                // transfer content
+                if (!(/^\s*<br\/?>\s*$/.test(this.map[row][col].el.innerHTML.toLowerCase()))) {
+                  this.map[this.idx_start.row][this.idx_start.col].el.innerHTML += ' ' + this.map[row][col].el.innerHTML;
+                }
+                removeElement(this.map[row][col].el);
+              }
+
+            }
+          }
+          this.rectify();
+        } else {
+          if (window.console) {
+            console.log('Do not know how to merge allready merged cells.');
+          }
+        }
+      }
+    },
+
+    // Decreases rowspan of a cell if it is done on first cell of rowspan row (real cell)
+    // Cell is moved to next row (if it is real)
+    collapseCellToNextRow: function(cell) {
+      var cellIdx = this.getMapIndex(cell.el),
+        newRowIdx = cellIdx.row + 1,
+        newIdx = {'row': newRowIdx, 'col': cellIdx.col};
+
+      if (newRowIdx < this.map.length) {
+
+        var row = this.getRealRowEl(false, newIdx);
+        if (row !== null) {
+          var n_cidx = this.correctColIndexForUnreals(newIdx.col, newIdx.row);
+          if (n_cidx >= 0) {
+            insertAfter(this.getRowCells(row)[n_cidx], cell.el);
+          } else {
+            var lastCell = this.getLastNewCellOnRow(row, newRowIdx);
+            if (lastCell !== null) {
+              insertAfter(lastCell, cell.el);
+            } else {
+              row.insertBefore(cell.el, row.firstChild);
+            }
+          }
+          if (parseInt(api.getAttribute(cell.el, 'rowspan'), 10) > 2) {
+            cell.el.setAttribute('rowspan', parseInt(api.getAttribute(cell.el, 'rowspan'), 10) - 1);
+          } else {
+            cell.el.removeAttribute('rowspan');
+          }
+        }
+      }
+    },
+
+    // Removes a cell when removing a row
+    // If is rowspan cell then decreases the rowspan
+    // and moves cell to next row if needed (is first cell of rowspan)
+    removeRowCell: function(cell) {
+      if (cell.isReal) {
+        if (cell.isRowspan) {
+          this.collapseCellToNextRow(cell);
+        } else {
+          removeElement(cell.el);
+        }
+      } else {
+        if (parseInt(api.getAttribute(cell.el, 'rowspan'), 10) > 2) {
+          cell.el.setAttribute('rowspan', parseInt(api.getAttribute(cell.el, 'rowspan'), 10) - 1);
+        } else {
+          cell.el.removeAttribute('rowspan');
+        }
+      }
+    },
+
+    getRowElementsByCell: function() {
+      var cells = [];
+      this.setTableMap();
+      this.idx = this.getMapIndex(this.cell);
+      if (this.idx !== false) {
+        var modRow = this.map[this.idx.row];
+        for (var cidx = 0, cmax = modRow.length; cidx < cmax; cidx++) {
+          if (modRow[cidx].isReal) {
+            cells.push(modRow[cidx].el);
+          }
+        }
+      }
+      return cells;
+    },
+
+    getColumnElementsByCell: function() {
+      var cells = [];
+      this.setTableMap();
+      this.idx = this.getMapIndex(this.cell);
+      if (this.idx !== false) {
+        for (var ridx = 0, rmax = this.map.length; ridx < rmax; ridx++) {
+          if (this.map[ridx][this.idx.col] && this.map[ridx][this.idx.col].isReal) {
+            cells.push(this.map[ridx][this.idx.col].el);
+          }
+        }
+      }
+      return cells;
+    },
+
+    // Removes the row of selected cell
+    removeRow: function() {
+      var oldRow = api.getParentElement(this.cell, { query: "tr" });
+      if (oldRow) {
+        this.setTableMap();
+        this.idx = this.getMapIndex(this.cell);
+        if (this.idx !== false) {
+          var modRow = this.map[this.idx.row];
+          for (var cidx = 0, cmax = modRow.length; cidx < cmax; cidx++) {
+            if (!modRow[cidx].modified) {
+              this.setCellAsModified(modRow[cidx]);
+              this.removeRowCell(modRow[cidx]);
+            }
+          }
+        }
+        removeElement(oldRow);
+      }
+    },
+
+    removeColCell: function(cell) {
+      if (cell.isColspan) {
+        if (parseInt(api.getAttribute(cell.el, 'colspan'), 10) > 2) {
+          cell.el.setAttribute('colspan', parseInt(api.getAttribute(cell.el, 'colspan'), 10) - 1);
+        } else {
+          cell.el.removeAttribute('colspan');
+        }
+      } else if (cell.isReal) {
+        removeElement(cell.el);
+      }
+    },
+
+    removeColumn: function() {
+      this.setTableMap();
+      this.idx = this.getMapIndex(this.cell);
+      if (this.idx !== false) {
+        for (var ridx = 0, rmax = this.map.length; ridx < rmax; ridx++) {
+          if (!this.map[ridx][this.idx.col].modified) {
+            this.setCellAsModified(this.map[ridx][this.idx.col]);
+            this.removeColCell(this.map[ridx][this.idx.col]);
+          }
+        }
+      }
+    },
+
+    // removes row or column by selected cell element
+    remove: function(what) {
+      if (this.rectify()) {
+        switch (what) {
+          case 'row':
+            this.removeRow();
+          break;
+          case 'column':
+            this.removeColumn();
+          break;
+        }
+        this.rectify();
+      }
+    },
+
+    addRow: function(where) {
+      var doc = this.table.ownerDocument;
+
+      this.setTableMap();
+      this.idx = this.getMapIndex(this.cell);
+      if (where == "below" && api.getAttribute(this.cell, 'rowspan')) {
+        this.idx.row = this.idx.row + parseInt(api.getAttribute(this.cell, 'rowspan'), 10) - 1;
+      }
+
+      if (this.idx !== false) {
+        var modRow = this.map[this.idx.row],
+          newRow = doc.createElement('tr');
+
+        for (var ridx = 0, rmax = modRow.length; ridx < rmax; ridx++) {
+          if (!modRow[ridx].modified) {
+            this.setCellAsModified(modRow[ridx]);
+            this.addRowCell(modRow[ridx], newRow, where);
+          }
+        }
+
+        switch (where) {
+          case 'below':
+            insertAfter(this.getRealRowEl(true), newRow);
+          break;
+          case 'above':
+            var cr = api.getParentElement(this.map[this.idx.row][this.idx.col].el, { query: "tr" });
+            if (cr) {
+              cr.parentNode.insertBefore(newRow, cr);
+            }
+          break;
+        }
+      }
+    },
+
+    addRowCell: function(cell, row, where) {
+      var colSpanAttr = (cell.isColspan) ? {"colspan" : api.getAttribute(cell.el, 'colspan')} : null;
+      if (cell.isReal) {
+        if (where != 'above' && cell.isRowspan) {
+          cell.el.setAttribute('rowspan', parseInt(api.getAttribute(cell.el,'rowspan'), 10) + 1);
+        } else {
+          row.appendChild(this.createCells('td', 1, colSpanAttr));
+        }
+      } else {
+        if (where != 'above' && cell.isRowspan && cell.lastRow) {
+          row.appendChild(this.createCells('td', 1, colSpanAttr));
+        } else if (c.isRowspan) {
+          cell.el.attr('rowspan', parseInt(api.getAttribute(cell.el, 'rowspan'), 10) + 1);
+        }
+      }
+    },
+
+    add: function(where) {
+      if (this.rectify()) {
+        if (where == 'below' || where == 'above') {
+          this.addRow(where);
+        }
+        if (where == 'before' || where == 'after') {
+          this.addColumn(where);
+        }
+      }
+    },
+
+    addColCell: function (cell, ridx, where) {
+      var doAdd,
+        cType = cell.el.tagName.toLowerCase();
+
+      // defines add cell vs expand cell conditions
+      // true means add
+      switch (where) {
+        case "before":
+          doAdd = (!cell.isColspan || cell.firstCol);
+        break;
+        case "after":
+          doAdd = (!cell.isColspan || cell.lastCol || (cell.isColspan && cell.el == this.cell));
+        break;
+      }
+
+      if (doAdd){
+        // adds a cell before or after current cell element
+        switch (where) {
+          case "before":
+            cell.el.parentNode.insertBefore(this.createCells(cType, 1), cell.el);
+          break;
+          case "after":
+            insertAfter(cell.el, this.createCells(cType, 1));
+          break;
+        }
+
+        // handles if cell has rowspan
+        if (cell.isRowspan) {
+          this.handleCellAddWithRowspan(cell, ridx+1, where);
+        }
+
+      } else {
+        // expands cell
+        cell.el.setAttribute('colspan',  parseInt(api.getAttribute(cell.el, 'colspan'), 10) + 1);
+      }
+    },
+
+    addColumn: function(where) {
+      var row, modCell;
+
+      this.setTableMap();
+      this.idx = this.getMapIndex(this.cell);
+      if (where == "after" && api.getAttribute(this.cell, 'colspan')) {
+        this.idx.col = this.idx.col + parseInt(api.getAttribute(this.cell, 'colspan'), 10) - 1;
+      }
+
+      if (this.idx !== false) {
+        for (var ridx = 0, rmax = this.map.length; ridx < rmax; ridx++ ) {
+          row = this.map[ridx];
+          if (row[this.idx.col]) {
+            modCell = row[this.idx.col];
+            if (!modCell.modified) {
+              this.setCellAsModified(modCell);
+              this.addColCell(modCell, ridx , where);
+            }
+          }
+        }
+      }
+    },
+
+    handleCellAddWithRowspan: function (cell, ridx, where) {
+      var addRowsNr = parseInt(api.getAttribute(this.cell, 'rowspan'), 10) - 1,
+        crow = api.getParentElement(cell.el, { query: "tr" }),
+        cType = cell.el.tagName.toLowerCase(),
+        cidx, temp_r_cells,
+        doc = this.table.ownerDocument,
+        nrow;
+
+      for (var i = 0; i < addRowsNr; i++) {
+        cidx = this.correctColIndexForUnreals(this.idx.col, (ridx + i));
+        crow = nextNode(crow, 'tr');
+        if (crow) {
+          if (cidx > 0) {
+            switch (where) {
+              case "before":
+                temp_r_cells = this.getRowCells(crow);
+                if (cidx > 0 && this.map[ridx + i][this.idx.col].el != temp_r_cells[cidx] && cidx == temp_r_cells.length - 1) {
+                   insertAfter(temp_r_cells[cidx], this.createCells(cType, 1));
+                } else {
+                  temp_r_cells[cidx].parentNode.insertBefore(this.createCells(cType, 1), temp_r_cells[cidx]);
+                }
+
+              break;
+              case "after":
+                insertAfter(this.getRowCells(crow)[cidx], this.createCells(cType, 1));
+              break;
+            }
+          } else {
+            crow.insertBefore(this.createCells(cType, 1), crow.firstChild);
+          }
+        } else {
+          nrow = doc.createElement('tr');
+          nrow.appendChild(this.createCells(cType, 1));
+          this.table.appendChild(nrow);
+        }
+      }
+    }
+  };
+
+  api.table = {
+    getCellsBetween: function(cell1, cell2) {
+      var c1 = new TableModifyerByCell(cell1);
+      return c1.getMapElsTo(cell2);
+    },
+
+    addCells: function(cell, where) {
+      var c = new TableModifyerByCell(cell);
+      c.add(where);
+    },
+
+    removeCells: function(cell, what) {
+      var c = new TableModifyerByCell(cell);
+      c.remove(what);
+    },
+
+    mergeCellsBetween: function(cell1, cell2) {
+      var c1 = new TableModifyerByCell(cell1);
+      c1.merge(cell2);
+    },
+
+    unmergeCell: function(cell) {
+      var c = new TableModifyerByCell(cell);
+      c.unmerge();
+    },
+
+    orderSelectionEnds: function(cell, cell2) {
+      var c = new TableModifyerByCell(cell);
+      return c.orderSelectionEnds(cell2);
+    },
+
+    indexOf: function(cell) {
+      var c = new TableModifyerByCell(cell);
+      c.setTableMap();
+      return c.getMapIndex(cell);
+    },
+
+    findCell: function(table, idx) {
+      var c = new TableModifyerByCell(null, table);
+      return c.getElementAtIndex(idx);
+    },
+
+    findRowByCell: function(cell) {
+      var c = new TableModifyerByCell(cell);
+      return c.getRowElementsByCell();
+    },
+
+    findColumnByCell: function(cell) {
+      var c = new TableModifyerByCell(cell);
+      return c.getColumnElementsByCell();
+    },
+
+    canMerge: function(cell1, cell2) {
+      var c = new TableModifyerByCell(cell1);
+      return c.canMerge(cell2);
+    }
+  };
+
+})();
+
+(function() {
+
+  // Keep the old composer.observe function.
+  var oldObserverFunction = wysihtml.views.Composer.prototype.observe;
+
+  var extendedObserverFunction = function() {
+    oldObserverFunction.call(this);
+    // Bind the table user interaction tracking
+    if (this.config.handleTables) {
+      // If handleTables option is true, table handling functions are bound
+      initTableHandling.call(this);
+    }
+  };
+
+  // Table management.
+  // If present enableObjectResizing and enableInlineTableEditing command
+  // should be called with false to prevent native table handlers.
+  var initTableHandling = function() {
+    var hideHandlers = function() {
+          this.win.removeEventListener('load', hideHandlers);
+          this.doc.execCommand('enableObjectResizing', false, 'false');
+          this.doc.execCommand('enableInlineTableEditing', false, 'false');
+        }.bind(this),
+        iframeInitiator = (function() {
+          hideHandlers.call(this);
+          this.actions.removeListeners(this.sandbox.getIframe(), ['focus', 'mouseup', 'mouseover'], iframeInitiator);
+        }).bind(this);
+
+    if (
+      this.doc.execCommand &&
+      wysihtml.browser.supportsCommand(this.doc, 'enableObjectResizing') &&
+      wysihtml.browser.supportsCommand(this.doc, 'enableInlineTableEditing')
+    ) {
+      if (this.sandbox.getIframe) {
+        this.actions.addListeners(this.sandbox.getIframe(), ['focus', 'mouseup', 'mouseover'], iframeInitiator);
+      } else {
+        this.win.addEventListener('load', hideHandlers);
+      }
+    }
+    this.tableSelection = wysihtml.quirks.tableCellsSelection(this.element, this.parent);
+  };
+
+  // Cell selections handling
+  var tableCellsSelection = function(editable, editor) {
+
+    var init = function() {
+      editable.addEventListener('mousedown', handleMouseDown);
+      return select;
+    };
+
+    var handleMouseDown = function(event) {
+      var target = wysihtml.dom.getParentElement(event.target, {query: 'td, th'}, false, editable);
+      if (target) {
+        handleSelectionMousedown(target);
+      }
+    };
+
+    var handleSelectionMousedown = function(target) {
+      select.start = target;
+      select.end = target;
+      select.cells = [target];
+      select.table = dom.getParentElement(select.start, {query: 'table'}, false, editable);
+
+      if (select.table) {
+        removeCellSelections();
+        dom.addClass(target, selectionClass);
+        editable.addEventListener('mousemove', handleMouseMove);
+        editable.addEventListener('mouseup', handleMouseUp);
+        editor.fire('tableselectstart').fire('tableselectstart:composer');
+      }
+    };
+
+    // remove all selection classes
+    var removeCellSelections = function() {
+      if (editable) {
+        var selectedCells = editable.querySelectorAll('.' + selectionClass);
+        if (selectedCells.length > 0) {
+          for (var i = 0; i < selectedCells.length; i++) {
+            dom.removeClass(selectedCells[i], selectionClass);
+          }
+        }
+      }
+    };
+
+    var addSelections = function(cells) {
+      for (var i = 0; i < cells.length; i++) {
+        dom.addClass(cells[i], selectionClass);
+      }
+    };
+
+    var handleMouseMove = function(event) {
+      var curTable = null,
+        cell = dom.getParentElement(event.target, {query: 'td, th'}, false, editable),
+        oldEnd;
+
+      if (cell && select.table && select.start) {
+        curTable =  dom.getParentElement(cell, {query: 'table'}, false, editable);
+        if (curTable && curTable === select.table) {
+          removeCellSelections();
+          oldEnd = select.end;
+          select.end = cell;
+          select.cells = dom.table.getCellsBetween(select.start, cell);
+          if (select.cells.length > 1) {
+            editor.composer.selection.deselect();
+          }
+          addSelections(select.cells);
+          if (select.end !== oldEnd) {
+            editor.fire('tableselectchange').fire('tableselectchange:composer');
+          }
+        }
+      }
+    };
+
+    var handleMouseUp = function(event) {
+      editable.removeEventListener('mousemove', handleMouseMove);
+      editable.removeEventListener('mouseup', handleMouseUp);
+      editor.fire('tableselect').fire('tableselect:composer');
+      setTimeout(function() {
+        bindSideclick();
+      }, 0);
+    };
+
+    var sideClickHandler = function(event) {
+      editable.ownerDocument.removeEventListener('click', sideClickHandler);
+      if (dom.getParentElement(event.target, {query: 'table'}, false, editable) != select.table) {
+        removeCellSelections();
+        select.table = null;
+        select.start = null;
+        select.end = null;
+        editor.fire('tableunselect').fire('tableunselect:composer');
+      }
+    };
+
+    var bindSideclick = function() {
+      editable.ownerDocument.addEventListener('click', sideClickHandler);
+    };
+
+    var selectCells = function(start, end) {
+      select.start = start;
+      select.end = end;
+      select.table = dom.getParentElement(select.start, {query: 'table'}, false, editable);
+      selectedCells = dom.table.getCellsBetween(select.start, select.end);
+      addSelections(selectedCells);
+      bindSideclick();
+      editor.fire('tableselect').fire('tableselect:composer');
+    };
+
+    var dom = wysihtml.dom,
+        select = {
+          table: null,
+          start: null,
+          end: null,
+          cells: null,
+          select: selectCells
+        },
+        selectionClass = 'wysiwyg-tmp-selected-cell';
+
+    return init();
+  };
+
+  // Bind to wysihtml
+  wysihtml.Editor.prototype.defaults.handleTables = true;
+  wysihtml.quirks.tableCellsSelection = tableCellsSelection;
+  wysihtml.views.Composer.prototype.observe = extendedObserverFunction;
+})();
+/**
+ * Toolbar Dialog
+ *
+ * @param {Element} link The toolbar link which causes the dialog to show up
+ * @param {Element} container The dialog container
+ *
+ * @example
+ *    <!-- Toolbar link -->
+ *    <a data-wysihtml-command="insertImage">insert an image</a>
+ *
+ *    <!-- Dialog -->
+ *    <div data-wysihtml-dialog="insertImage" style="display: none;">
+ *      <label>
+ *        URL: <input data-wysihtml-dialog-field="src" value="http://">
+ *      </label>
+ *      <label>
+ *        Alternative text: <input data-wysihtml-dialog-field="alt" value="">
+ *      </label>
+ *    </div>
+ *
+ *    <script>
+ *      var dialog = new wysihtml.toolbar.Dialog(
+ *        document.querySelector("[data-wysihtml-command='insertImage']"),
+ *        document.querySelector("[data-wysihtml-dialog='insertImage']")
+ *      );
+ *      dialog.observe("save", function(attributes) {
+ *        // do something
+ *      });
+ *    </script>
+ */
+(function(wysihtml) {
+    var dom                     = wysihtml.dom,
+        CLASS_NAME_OPENED       = "wysihtml-command-dialog-opened",
+        SELECTOR_FORM_ELEMENTS  = "input, select, textarea",
+        SELECTOR_FIELDS         = "[data-wysihtml-dialog-field]",
+        ATTRIBUTE_FIELDS        = "data-wysihtml-dialog-field";
+  
+  
+    wysihtml.toolbar.Dialog = wysihtml.lang.Dispatcher.extend(
+        /** @scope wysihtml.toolbar.Dialog.prototype */ {
+        constructor: function(link, container) {
+            this.link       = link;
+            this.container  = container;
+        },
+        
+        _observe: function() {
+            if (this._observed) {
+                return;
+            }
+            
+            var that = this,
+            callbackWrapper = function(event) {
+                var attributes = that._serialize();
+                that.fire("save", attributes);
+                that.hide();
+                event.preventDefault();
+                event.stopPropagation();
+            };
+            
+            dom.observe(that.link, "click", function() {
+                if (dom.hasClass(that.link, CLASS_NAME_OPENED)) {
+                    setTimeout(function() { that.hide(); }, 0);
+                }
+            });
+            
+            dom.observe(this.container, "keydown", function(event) {
+                var keyCode = event.keyCode;
+                if (keyCode === wysihtml.ENTER_KEY) {
+                    callbackWrapper(event);
+                }
+                
+                if (keyCode === wysihtml.ESCAPE_KEY) {
+                    that.cancel();
+                }
+            });
+            
+            dom.delegate(this.container, "[data-wysihtml-dialog-action=save]", "click", callbackWrapper);
+            dom.delegate(this.container, "[data-wysihtml-dialog-action=cancel]", "click", function(event) {
+                that.cancel();
+                event.preventDefault();
+                event.stopPropagation();
+            });
+            
+            this._observed = true;
+        },
+        
+        
+        /**
+        * Grabs all fields in the dialog and puts them in key=>value style in an object which
+        * then gets returned
+        */
+        _serialize: function() {
+            var data    = {},
+                fields  = this.container.querySelectorAll(SELECTOR_FIELDS),
+                length  = fields.length,
+                i       = 0;
+                
+            for (; i<length; i++) {
+                data[fields[i].getAttribute(ATTRIBUTE_FIELDS)] = fields[i].value;
+            }
+            
+            return data;
+        },
+  
+        /**
+        * Takes the attributes of the "elementToChange"
+        * and inserts them in their corresponding dialog input fields
+        *
+        * Assume the "elementToChange" looks like this:
+        *    <a href="http://www.google.com" target="_blank">foo</a>
+        *
+        * and we have the following dialog:
+        *    <input type="text" data-wysihtml-dialog-field="href" value="">
+        *    <input type="text" data-wysihtml-dialog-field="target" value="">
+        *
+        * after calling _interpolate() the dialog will look like this
+        *    <input type="text" data-wysihtml-dialog-field="href" value="http://www.google.com">
+        *    <input type="text" data-wysihtml-dialog-field="target" value="_blank">
+        *
+        * Basically it adopted the attribute values into the corresponding input fields
+        *
+        */
+        _interpolate: function(avoidHiddenFields) {
+            var field,
+                fieldName,
+                newValue,
+                focusedElement = document.querySelector(":focus"),
+                fields         = this.container.querySelectorAll(SELECTOR_FIELDS),
+                length         = fields.length,
+                i              = 0;
+            for (; i<length; i++) {
+                field = fields[i];
+                
+                // Never change elements where the user is currently typing in
+                if (field === focusedElement) {
+                    continue;
+                }
+  
+                // Don't update hidden fields
+                // See https://github.com/xing/wysihtml5/pull/14
+                if (avoidHiddenFields && field.type === "hidden") {
+                    continue;
+                }
+  
+                fieldName = field.getAttribute(ATTRIBUTE_FIELDS);
+                newValue  = (this.elementToChange && typeof(this.elementToChange) !== 'boolean') ? (this.elementToChange.getAttribute(fieldName) || "") : field.defaultValue;
+                field.value = newValue;
+            }
+        },
+        
+        update: function (elementToChange) {
+            this.elementToChange = elementToChange ? elementToChange : this.elementToChange;
+            this._interpolate();
+        },
+  
+        /**
+         * Show the dialog element
+         */
+        show: function(elementToChange) {
+            var firstField  = this.container.querySelector(SELECTOR_FORM_ELEMENTS);
+
+            this._observe();
+            this.update(elementToChange);
+
+            dom.addClass(this.link, CLASS_NAME_OPENED);
+            this.container.style.display = "";
+            this.isOpen = true;
+            this.fire("show");
+
+            if (firstField && !elementToChange) {
+                try {
+                    firstField.focus();
+                } catch(e) {}
+            }
+        },
+  
+        /**
+         * Hide the dialog element
+         */
+        _hide: function(focus) {
+            this.elementToChange = null;
+            dom.removeClass(this.link, CLASS_NAME_OPENED);
+            this.container.style.display = "none";
+            this.isOpen = false;
+        },
+
+        hide: function() {
+            this._hide();
+            this.fire("hide");
+        },
+
+        cancel: function() {
+            this._hide();
+            this.fire("cancel");
+        }
+    });
+})(wysihtml); //jshint ignore:line
+  
+(function(wysihtml) {
+    var dom                     = wysihtml.dom,
+        SELECTOR_FIELDS         = "[data-wysihtml-dialog-field]",
+        ATTRIBUTE_FIELDS        = "data-wysihtml-dialog-field";
+  
+    wysihtml.toolbar.Dialog_bgColorStyle = wysihtml.toolbar.Dialog.extend({
+        multiselect: true,
+        _serialize: function() {
+            var data    = {},
+                fields  = this.container.querySelectorAll(SELECTOR_FIELDS),
+                length  = fields.length,
+                i       = 0;
+                
+            for (; i<length; i++) {
+                data[fields[i].getAttribute(ATTRIBUTE_FIELDS)] = fields[i].value;
+            }
+            return data;
+        },
+        
+        _interpolate: function(avoidHiddenFields) {
+            var field,
+                fieldName,
+                newValue,
+                focusedElement = document.querySelector(":focus"),
+                fields         = this.container.querySelectorAll(SELECTOR_FIELDS),
+                length         = fields.length,
+                i              = 0,
+                firstElement   = (this.elementToChange) ? ((wysihtml.lang.object(this.elementToChange).isArray()) ? this.elementToChange[0] : this.elementToChange) : null,
+                colorStr       = (firstElement) ? firstElement.getAttribute('style') : null,
+                color          = (colorStr) ? wysihtml.quirks.styleParser.parseColor(colorStr, "background-color") : null;
+  
+            for (; i<length; i++) {
+                field = fields[i];
+                // Never change elements where the user is currently typing in
+                if (field === focusedElement) {
+                    continue;
+                }
+                // Don't update hidden fields3
+                if (avoidHiddenFields && field.type === "hidden") {
+                    continue;
+                }
+                if (field.getAttribute(ATTRIBUTE_FIELDS) === "color") {
+                    if (color) {
+                        if (color[3] && color[3] != 1) {
+                            field.value = "rgba(" + color[0] + "," + color[1] + "," + color[2] + "," + color[3] + ");";
+                        } else {
+                            field.value = "rgb(" + color[0] + "," + color[1] + "," + color[2] + ");";
+                        }
+                    } else {
+                        field.value = "rgb(0,0,0);";
+                    }
+                }
+            }
+        }
+    });
+})(wysihtml);
+    
+(function(wysihtml) {
+    wysihtml.toolbar.Dialog_createTable = wysihtml.toolbar.Dialog.extend({
+        show: function(elementToChange) {
+            this.base(elementToChange);
+        }
+    });
+})(wysihtml);
+    
+(function(wysihtml) {
+    var dom                     = wysihtml.dom,
+        SELECTOR_FIELDS         = "[data-wysihtml-dialog-field]",
+        ATTRIBUTE_FIELDS        = "data-wysihtml-dialog-field";
+        
+    wysihtml.toolbar.Dialog_fontSizeStyle = wysihtml.toolbar.Dialog.extend({
+        multiselect: true,
+        _serialize: function() {
+            return {"size" : this.container.querySelector('[data-wysihtml-dialog-field="size"]').value};
+        },
+        
+        _interpolate: function(avoidHiddenFields) {
+            var focusedElement = document.querySelector(":focus"),
+            field          = this.container.querySelector("[data-wysihtml-dialog-field='size']"),
+            firstElement   = (this.elementToChange) ? ((wysihtml.lang.object(this.elementToChange).isArray()) ? this.elementToChange[0] : this.elementToChange) : null,
+            styleStr       = (firstElement) ? firstElement.getAttribute('style') : null,
+            size           = (styleStr) ? wysihtml.quirks.styleParser.parseFontSize(styleStr) : null;
+            
+            if (field && field !== focusedElement && size && !(/^\s*$/).test(size)) {
+                field.value = size;
+            }
+        }
+    });
+})(wysihtml);
+    
+(function(wysihtml) {
+    var SELECTOR_FIELDS         = "[data-wysihtml-dialog-field]",
+        ATTRIBUTE_FIELDS        = "data-wysihtml-dialog-field";
+        
+    wysihtml.toolbar.Dialog_foreColorStyle = wysihtml.toolbar.Dialog.extend({
+        multiselect: true,
+        _serialize: function() {
+            var data    = {},
+                fields  = this.container.querySelectorAll(SELECTOR_FIELDS),
+                length  = fields.length,
+                i       = 0;
+
+            for (; i<length; i++) {
+                data[fields[i].getAttribute(ATTRIBUTE_FIELDS)] = fields[i].value;
+            }
+            return data;
+        },
+        
+        _interpolate: function(avoidHiddenFields) {
+            var field, colourMode,
+                styleParser = wysihtml.quirks.styleParser,
+                focusedElement = document.querySelector(":focus"),
+                fields         = this.container.querySelectorAll(SELECTOR_FIELDS),
+                length         = fields.length,
+                i              = 0,
+                firstElement   = (this.elementToChange) ? ((wysihtml.lang.object(this.elementToChange).isArray()) ? this.elementToChange[0] : this.elementToChange) : null,
+                colourStr       = (firstElement) ? firstElement.getAttribute("style") : null,
+                colour          = (colourStr) ? styleParser.parseColor(colourStr, "color") : null;
+                
+            for (; i<length; i++) {
+                field = fields[i];
+                // Never change elements where the user is currently typing in
+                if (field === focusedElement) {
+                    continue;
+                }
+                
+                // Don't update hidden fields3
+                if (avoidHiddenFields && field.type === "hidden") {
+                    continue;
+                }
+                
+                if (field.getAttribute(ATTRIBUTE_FIELDS) === "color") {
+                    colourMode = (field.dataset.colormode || "rgb").toLowerCase();
+                    colourMode = colourMode === "hex" ? "hash" : colourMode;
+                    
+                    if (colour) {
+                        field.value = styleParser.unparseColor(colour, colourMode);
+                    } else {
+                        field.value = styleParser.unparseColor([0, 0, 0], colourMode);
+                    }
+                }
+            }
+        }
+    });
+})(wysihtml);
+  
+
+  
+  
+  
+/**
+ * Toolbar
+ *
+ * @param {Object} parent Reference to instance of Editor instance
+ * @param {Element} container Reference to the toolbar container element
+ *
+ * @example
+ *    <div id="toolbar">
+ *      <a data-wysihtml-command="createLink">insert link</a>
+ *      <a data-wysihtml-command="formatBlock" data-wysihtml-command-value="h1">insert h1</a>
+ *    </div>
+ *
+ *    <script>
+ *      var toolbar = new wysihtml.toolbar.Toolbar(editor, document.getElementById("toolbar"));
+ *    </script>
+ */
+(function(wysihtml) {
+    var CLASS_NAME_COMMAND_DISABLED   = "wysihtml-command-disabled",
+        CLASS_NAME_COMMANDS_DISABLED  = "wysihtml-commands-disabled",
+        CLASS_NAME_COMMAND_ACTIVE     = "wysihtml-command-active",
+        CLASS_NAME_ACTION_ACTIVE      = "wysihtml-action-active",
+        dom                           = wysihtml.dom;
+  
+    wysihtml.toolbar.Toolbar = Base.extend(
+      /** @scope wysihtml.toolbar.Toolbar.prototype */ {
+          constructor: function(editor, container, showOnInit) {
+            this.editor     = editor;
+            this.container  = typeof(container) === "string" ? document.getElementById(container) : container;
+            this.composer   = editor.composer;
+
+            this._getLinks("command");
+            this._getLinks("action");
+
+            this._observe();
+            if (showOnInit) { this.show(); }
+
+            if (editor.config.classNameCommandDisabled != null) {
+                CLASS_NAME_COMMAND_DISABLED = editor.config.classNameCommandDisabled;
+            }
+            if (editor.config.classNameCommandsDisabled != null) {
+                CLASS_NAME_COMMANDS_DISABLED = editor.config.classNameCommandsDisabled;
+            }
+            if (editor.config.classNameCommandActive != null) {
+                CLASS_NAME_COMMAND_ACTIVE = editor.config.classNameCommandActive;
+            }
+            if (editor.config.classNameActionActive != null) {
+                CLASS_NAME_ACTION_ACTIVE = editor.config.classNameActionActive;
+            }
+
+            var speechInputLinks  = this.container.querySelectorAll("[data-wysihtml-command=insertSpeech]"),
+                length            = speechInputLinks.length,
+                i                 = 0;
+            for (; i<length; i++) {
+                new wysihtml.toolbar.Speech(this, speechInputLinks[i]);
+            }
+        },
+        
+        _getLinks: function(type) {
+            var links   = this[type + "Links"] = wysihtml.lang.array(this.container.querySelectorAll("[data-wysihtml-" + type + "]")).get(),
+                length  = links.length,
+                i       = 0,
+                mapping = this[type + "Mapping"] = {},
+                link,
+                group,
+                name,
+                value,
+                dialog,
+                tracksBlankValue;
+                
+            for (; i<length; i++) {
+                link    = links[i];
+                name    = link.getAttribute("data-wysihtml-" + type);
+                value   = link.getAttribute("data-wysihtml-" + type + "-value");
+                tracksBlankValue   = link.getAttribute("data-wysihtml-" + type + "-blank-value");
+                group   = this.container.querySelector("[data-wysihtml-" + type + "-group='" + name + "']");
+                dialog  = this._getDialog(link, name);
+                
+                mapping[name + ":" + value] = {
+                    link:   link,
+                    group:  group,
+                    name:   name,
+                    value:  value,
+                    tracksBlankValue: tracksBlankValue,
+                    dialog: dialog,
+                    state:  false
+                };
+            }
+        },
+        
+        _getDialog: function(link, command) {
+            var that          = this,
+                dialogElement = this.container.querySelector("[data-wysihtml-dialog='" + command + "']"),
+                dialog, caretBookmark;
+                
+            if (dialogElement) {
+                if (wysihtml.toolbar["Dialog_" + command]) {
+                    dialog = new wysihtml.toolbar["Dialog_" + command](link, dialogElement);
+                } else {
+                    dialog = new wysihtml.toolbar.Dialog(link, dialogElement);
+                }
+                
+                dialog.on("show", function() {
+                    caretBookmark = that.composer.selection.getBookmark();
+                    that.editor.fire("show:dialog", { command: command, dialogContainer: dialogElement, commandLink: link });
+                });
+                
+                dialog.on("save", function(attributes) {
+                    if (caretBookmark) {
+                        that.composer.selection.setBookmark(caretBookmark);
+                    }
+                    that._execCommand(command, attributes);
+                    that.editor.fire("save:dialog", { command: command, dialogContainer: dialogElement, commandLink: link });
+                    that._hideAllDialogs();
+                    that._preventInstantFocus();
+                    caretBookmark = undefined;
+                
+                });
+                
+                dialog.on("cancel", function() {
+                    if (caretBookmark) {
+                        that.composer.selection.setBookmark(caretBookmark);
+                    }
+                    that.editor.fire("cancel:dialog", { command: command, dialogContainer: dialogElement, commandLink: link });
+                    caretBookmark = undefined;
+                    that._preventInstantFocus();
+                });
+                
+                dialog.on("hide", function() {
+                    that.editor.fire("hide:dialog", { command: command, dialogContainer: dialogElement, commandLink: link });
+                    caretBookmark = undefined;
+                });
+            }
+            return dialog;
+        },
+  
+        /**
+         * @example
+         *    var toolbar = new wysihtml.Toolbar();
+         *    // Insert a <blockquote> element or wrap current selection in <blockquote>
+         *    toolbar.execCommand("formatBlock", "blockquote");
+         */
+        execCommand: function(command, commandValue) {
+            if (this.commandsDisabled) {
+                return;
+            }
+            
+            this._execCommand(command, commandValue);
+        },
+        
+        _execCommand: function(command, commandValue) {
+            // Make sure that composer is focussed (false => don't move caret to the end)
+            this.editor.focus(false);
+            
+            this.composer.commands.exec(command, commandValue);
+            this._updateLinkStates();
+        },
+        
+        execAction: function(action) {
+            var editor = this.editor;
+            if (action === "change_view") {
+                if (editor.currentView === editor.textarea || editor.currentView === "source") {
+                    editor.fire("change_view", "composer");
+                } else {
+                    editor.fire("change_view", "textarea");
+                }
+            }
+            
+            if (action == "showSource") {
+                editor.fire("showSource");
+            }
+        },
+        
+        _observe: function() {
+            var that      = this,
+                editor    = this.editor,
+                container = this.container,
+                links     = this.commandLinks.concat(this.actionLinks),
+                length    = links.length,
+                i         = 0;
+                
+                
+            for (; i<length; i++) {
+                // 'javascript:;' and unselectable=on Needed for IE, but done in all browsers to make sure that all get the same css applied
+                // (you know, a:link { ... } doesn't match anchors with missing href attribute)
+                if (links[i].nodeName === "A") {
+                    dom.setAttributes({
+                        href:         "javascript:;",
+                        unselectable: "on"
+                    }).on(links[i]);
+                } else {
+                    dom.setAttributes({ unselectable: "on" }).on(links[i]);
+                }
+            }
+            
+            // Needed for opera and chrome
+            dom.delegate(container, "[data-wysihtml-command], [data-wysihtml-action]", "mousedown", function(event) { event.preventDefault(); });
+            
+            dom.delegate(container, "[data-wysihtml-command]", "click", function(event) {
+                var state,
+                    link          = this,
+                    command       = link.getAttribute("data-wysihtml-command"),
+                    commandValue  = link.getAttribute("data-wysihtml-command-value"),
+                    commandObj = that.commandMapping[command + ":" + commandValue];
+                    
+                if (commandValue || !commandObj.dialog) {
+                    that.execCommand(command, commandValue);
+                } else {
+                    state = getCommandState(that.composer, commandObj);
+                    commandObj.dialog.show(state);
+                }
+  
+                event.preventDefault();
+            });
+            
+            dom.delegate(container, "[data-wysihtml-action]", "click", function(event) {
+                var action = this.getAttribute("data-wysihtml-action");
+                that.execAction(action);
+                event.preventDefault();
+            });
+            
+            editor.on("interaction:composer", function(event) {
+                if (!that.preventFocus) {
+                    that._updateLinkStates();
+                }
+            });
+            
+            this._ownerDocumentClick = function(event) {
+                if (!wysihtml.dom.contains(that.container, event.target) && !wysihtml.dom.contains(that.composer.element, event.target)) {
+                    that._updateLinkStates();
+                    that._preventInstantFocus();
+                }
+            };
+            
+            
+            this.container.ownerDocument.addEventListener("click", this._ownerDocumentClick, false);
+            this.editor.on("destroy:composer", this.destroy.bind(this));
+            
+            if (this.editor.config.handleTables) {
+                editor.on("tableselect:composer", function() {
+                    that.container.querySelectorAll('[data-wysihtml-hiddentools="table"]')[0].style.display = "";
+                });
+                
+                editor.on("tableunselect:composer", function() {
+                    that.container.querySelectorAll('[data-wysihtml-hiddentools="table"]')[0].style.display = "none";
+                });
+            }
+            
+            editor.on("change_view", function(currentView) {
+                // Set timeout needed in order to let the blur event fire first
+                setTimeout(function() {
+                    that.commandsDisabled = (currentView !== "composer");
+                    that._updateLinkStates();
+                    if (that.commandsDisabled) {
+                        dom.addClass(container, CLASS_NAME_COMMANDS_DISABLED);
+                    } else {
+                        dom.removeClass(container, CLASS_NAME_COMMANDS_DISABLED);
+                    }
+                }, 0);
+            });
+        },
+        
+        destroy: function() {
+            this.container.ownerDocument.removeEventListener("click", this._ownerDocumentClick, false);
+        },
+        
+        _hideAllDialogs: function() {
+            var commandMapping      = this.commandMapping;
+            for (var i in commandMapping) {
+                if (commandMapping[i].dialog) {
+                    commandMapping[i].dialog.hide();
+                }
+            }
+        },
+        
+        _preventInstantFocus: function() {
+            this.preventFocus = true;
+            setTimeout(function() {
+                this.preventFocus = false;
+            }.bind(this),0);
+        },
+        
+        _updateLinkStates: function() {
+            var i, state, action, command, displayDialogAttributeValue,
+                commandMapping      = this.commandMapping,
+                composer            = this.composer,
+                actionMapping       = this.actionMapping;
+
+            // every millisecond counts... this is executed quite often
+            for (i in commandMapping) {
+                command = commandMapping[i];
+                if (this.commandsDisabled) {
+                    state = false;
+                    dom.removeClass(command.link, CLASS_NAME_COMMAND_ACTIVE);
+                    if (command.group) {
+                        dom.removeClass(command.group, CLASS_NAME_COMMAND_ACTIVE);
+                    }
+                    if (command.dialog) {
+                        command.dialog.hide();
+                    }
+                } else {
+                    state = this.composer.commands.state(command.name, command.value);
+                    dom.removeClass(command.link, CLASS_NAME_COMMAND_DISABLED);
+                    if (command.group) {
+                        dom.removeClass(command.group, CLASS_NAME_COMMAND_DISABLED);
+                    }
+                }
+                if (command.state === state && !command.tracksBlankValue) {
+                    continue;
+                }
+                
+                
+                command.state = state;
+                if (state) {
+                    if (command.tracksBlankValue) {
+                        dom.removeClass(command.link, CLASS_NAME_COMMAND_ACTIVE);
+                    } else {
+                        dom.addClass(command.link, CLASS_NAME_COMMAND_ACTIVE);
+                        if (command.group) {
+                            dom.addClass(command.group, CLASS_NAME_COMMAND_ACTIVE);
+                        }
+                        
+                        // commands with fixed value can not have a dialog.
+                        if (command.dialog && (typeof command.value === "undefined" || command.value === null)) {
+                            if (state && typeof state === "object") {
+                                state = getCommandState(composer, command);
+                                command.state = state;
+  
+                                // If dialog has dataset.showdialogonselection set as true,
+                                // Dialog displays on text state becoming active regardless of clobal showToolbarDialogsOnSelection options value
+                                displayDialogAttributeValue = command.dialog.container.dataset ? command.dialog.container.dataset.showdialogonselection : false;
+  
+                                if (composer.config.showToolbarDialogsOnSelection || displayDialogAttributeValue) {
+                                    command.dialog.show(state);
+                                } else {
+                                    command.dialog.update(state);
+                                }
+                            } else {
+                                command.dialog.hide();
+                            }
+                        }
+                    }
+                } else {
+                    if (command.tracksBlankValue) {
+                        dom.addClass(command.link, CLASS_NAME_COMMAND_ACTIVE);
+                    } else {
+                        dom.removeClass(command.link, CLASS_NAME_COMMAND_ACTIVE);
+                        if (command.group) {
+                            dom.removeClass(command.group, CLASS_NAME_COMMAND_ACTIVE);
+                        }
+                        
+                        // commands with fixed value can not have a dialog.
+                        if (command.dialog && !command.value) {
+                            command.dialog.hide();
+                        }
+                    }
+                }
+            }
+            
+            for (i in actionMapping) {
+                action = actionMapping[i];
+                if (action.name === "change_view") {
+                    action.state = this.editor.currentView === this.editor.textarea || this.editor.currentView === "source";
+                    if (action.state) {
+                        dom.addClass(action.link, CLASS_NAME_ACTION_ACTIVE);
+                    } else {
+                        dom.removeClass(action.link, CLASS_NAME_ACTION_ACTIVE);
+                    }
+                }
+            }
+        },
+        
+        show: function() {
+            this.container.style.display = "";
+        },
+        
+        hide: function() {
+            this.container.style.display = "none";
+        }
+    });
+    
+    function getCommandState (composer, command) {
+        var state = composer.commands.state(command.name, command.value);
+  
+        // Grab first and only object/element in state array, otherwise convert state into boolean
+        // to avoid showing a dialog for multiple selected elements which may have different attributes
+        // eg. when two links with different href are selected, the state will be an array consisting of both link elements
+        // but the dialog interface can only update one
+        if (!command.dialog.multiselect && wysihtml.lang.object(state).isArray()) {
+            state = state.length === 1 ? state[0] : true;
+        }
+
+        return state;
+    }
+    
+    // Extend defaults
+  
+    // Id of the toolbar element, pass falsey value if you don't want any toolbar logic
+    wysihtml.Editor.prototype.defaults.toolbar = undefined;
+
+    // Whether toolbar is displayed after init by script automatically.
+    // Can be set to false if toolobar is set to display only on editable area focus
+    wysihtml.Editor.prototype.defaults.showToolbarAfterInit = true;
+
+    // With default toolbar it shows dialogs in toolbar when their related text format state becomes active (click on link in text opens link dialogue)
+    wysihtml.Editor.prototype.defaults.showToolbarDialogsOnSelection= true;
+  
+    // Bind toolbar initiation on editor instance creation
+    wysihtml.extendEditor(function(editor) {
+        if (editor.config.toolbar) {
+            editor.toolbar = new wysihtml.toolbar.Toolbar(editor, editor.config.toolbar, editor.config.showToolbarAfterInit);
+            editor.on('destroy:composer', function() {
+                if (editor && editor.toolbar) {
+                    editor.toolbar.destroy();
+                }
+            });
+        }
+    });
 })(wysihtml);

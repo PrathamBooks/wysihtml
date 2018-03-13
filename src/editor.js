@@ -256,8 +256,286 @@
         "rules": this.config.pasteParserRulesets || [{"set": this.config.parserRules}],
         "uneditableClass": this.config.classNames.uneditableContainer
       });
+      
+      // Date :09.02.2017  Author : Manoj
+      // Getting the initial nodes and position of the marker
+      var beginSel = window.getSelection();
+      var bAncNode = beginSel.anchorNode;
+      var bOffSet = beginSel.anchorOffset;
+
       this.composer.selection.deleteContents();
       this.composer.selection.insertHTML(cleanHtml);
+
+      // Default case
+      try {
+        // Limit node where we have to close the tags
+        beginLimParent = bAncNode
+        if (beginLimParent.nodeName == 'P') {
+          //No need to do additional processing
+          parentPNode = beginLimParent;
+        }
+        else {
+          if (beginLimParent.nodeType ===3 && beginLimParent.parentNode.nodeName == 'P') {
+            // No need to do additional processing
+            parentPNode = beginLimParent.parentNode;  
+          }
+          else {
+            while(beginLimParent.parentNode.nodeName != 'P'){
+              beginLimParent = beginLimParent.parentNode;
+            }
+
+            parentPNode = beginLimParent.parentNode;
+
+            // Node which contains the copy/pasted content
+            if (bAncNode.parentNode.nodeName !== 'P') {
+              cutoffNode = bAncNode.parentNode
+            } else {
+              cutoffNode = bAncNode;
+            }
+
+            //getting the last copy node: created a dummy node to 
+            //keep track of the last node we are copying
+            var dummyNode = document.getElementById('dummyNode');
+            lastCopyNode = dummyNode.previousSibling;
+
+            // Closing the tags before pasted content
+            parent = beginLimParent.parentNode
+            var parentOffset = getNodeIndex(parent,beginLimParent)
+            var doc = bAncNode.ownerDocument
+            var leftRange = doc.createRange()
+            leftRange.setStart(parent,parentOffset)
+            leftRange.setEnd(bAncNode,bOffSet)
+            var left = leftRange.extractContents()
+            parent.insertBefore(left,beginLimParent)
+            var innerEl;
+            // If there are no element parent nodes until P node, skip this  
+            if(beginLimParent.nodeType != 3){               
+              while (cutoffNode.firstChild != null) {
+                child = cutoffNode.firstChild;
+                parent.insertBefore(child, beginLimParent)
+                if (child == lastCopyNode) {
+                  break;
+                }
+              }
+            }
+          }
+        }        
+
+        pElements = parentPNode.getElementsByTagName("p")
+        numP = pElements.length
+
+        // handling P tags, removing p tags inside of p
+
+        if (numP == 0) {
+          // If there are no p's the tree is already correct as all the tags
+          // can be nested
+          cleanUpBrTags(parentPNode)
+        } else if(numP == 1) {
+
+          pNode = pElements[0]
+          // Move the children to outside of 'p' and delete the 'p' Node
+          var innerEl;
+          while(innerEl=pNode.firstChild){
+            parentPNode.insertBefore(innerEl,pNode)
+          }
+          parentPNode.removeChild(pNode)
+
+          cleanUpBrTags(parentPNode)
+
+        } else {
+          firstPNode = pElements[0]
+          lastPNode = pElements[pElements.length - 1]
+
+          // Splitting the node at beginning of copy-paste
+          divParent = parentPNode.parentNode
+          var divParentOffSet = getNodeIndex(divParent, parentPNode)
+          var bdoc = parentPNode.ownerDocument
+          var lRange = bdoc.createRange()
+          lRange.setStart(divParent, divParentOffSet)
+          lRange.setEndAfter(firstPNode)
+          var lCon = lRange.extractContents()
+          divParent.insertBefore(lCon,parentPNode)
+
+          // First P node of the line
+          fPrevNode = parentPNode.previousSibling
+          // Moving the middle copy/pasted content outside of parent 'p' tag
+          var innerEl = parentPNode.firstChild;
+          while(innerEl != lastPNode){
+            divParent.insertBefore(innerEl,parentPNode)
+            innerEl = parentPNode.firstChild
+          }
+          // Merging the first 'p' of copy/paste with the first 'p' of the line
+          firstPToRemove = fPrevNode.getElementsByTagName('P')
+          var innerEl;
+          while(innerEl=firstPToRemove[0].firstChild){
+            fPrevNode.insertBefore(innerEl,firstPToRemove[0])
+          }
+          fPrevNode.removeChild(firstPToRemove[0])
+          
+          // Merging the last 'p' of copy/paste with the last 'p' of the line 
+          lastPToRemove = parentPNode.getElementsByTagName('P')
+          var innerEl;
+          while(innerEl=lastPToRemove[0].firstChild){
+            parentPNode.insertBefore(innerEl,lastPToRemove[0])
+          }
+          parentPNode.removeChild(lastPToRemove[0]) 
+          // Cleanup the br tags from fPrevNode to parentPnode (since this is the end P node)
+
+          var currNode = fPrevNode;
+          var nextNode;
+          while((currNode !== null) && (currNode.previousSibling != parentPNode) ){
+            nextNode = currNode.nextSibling;
+            cleanUpBrTags(currNode);
+            currNode = nextNode;
+          }
+        }
+
+        // Removing br and replacing them with the the 'p' tags to maintain styling
+        function cleanUpBrTags(parentNode){
+          if(parentNode.nodeType === 3){
+            return;
+          }
+          var isPNode = (parentNode.nodeName === 'P')
+          if(isPNode){
+            //Split P node
+            brTags = parentNode.getElementsByTagName('BR')
+            while(brTags[0]){
+              // split the p node into two and delete the br tag
+              splitPNodesOnBr(parentNode, brTags[0])
+              brTags[0].parentNode.removeChild(brTags[0])              
+            }
+          }else{
+            // find previous p and put the contents from that to here in a new p tag
+            prevPNode = parentNode.previousSibling
+            while(prevPNode.nodeName != 'P'){
+              prevPNode = prevPNode.previousSibling
+            }
+
+            if (parentNode.nodeName === 'BR') {
+              brTag = parentNode
+            } else {
+              brTags = parentNode.getElementsByTagName('BR')
+              brTag = brTags[0]
+            }
+
+            while(brTag){
+              parent = prevPNode.parentNode
+              var doc = prevPNode.ownerDocument;
+              var leftRange = doc.createRange();
+              leftRange.setStartAfter(prevPNode);
+              leftRange.setEndBefore(brTag);
+              var newPNode = doc.createElement("p");
+              leftRange.surroundContents(newPNode);
+              brTag.parentNode.removeChild(brTag)
+            }
+          }
+        }
+
+        function splitPNodesOnBr(node,brNode){
+          parent = node.parentNode;
+          var parentOffset = getNodeIndex(parent,node);
+          var doc = brNode.ownerDocument;
+          var leftRange = doc.createRange();
+          leftRange.setStart(parent,parentOffset);
+          leftRange.setEndBefore(brNode);
+          var left = leftRange.extractContents();
+          parent.insertBefore(left,node);
+        }
+
+
+        function getNodeIndex(parent, node) {
+          var index = parent.childNodes.length;
+          while (index--) {
+            if (node === parent.childNodes[index]) {
+              break;
+            }
+          }
+          return index;
+        }
+      }catch(e){
+        
+      }
+
+      // Adding span's to all p's for normal text.
+
+      if(this.composer.element.id === "txtEditor"){
+
+        // Adding p's to any non p element.
+        divElem = this.composer.element;
+        childNodes = divElem.childNodes;
+        var k;
+        for(k=0; k < childNodes.length; k++){
+          if(childNodes[k].nodeName !== 'P'){
+            newPNode = this.composer.doc.createElement("P");
+            innerNode = childNodes[k];
+            newPNode.appendChild(innerNode);
+            if(childNodes[k+1]){
+              divElem.insertBefore(newPNode, childNodes[k+1]);
+            }else{
+              divElem.appendChild(newPNode);
+            }
+          }
+        }
+
+
+
+        getPElements = this.composer.element.getElementsByTagName("P")
+        var i;
+        for(i=0; i < getPElements.length; i++){
+          pNode = getPElements[i]
+          if(hasTextNodes(pNode)){
+            spNode = this.composer.doc.createElement("span");
+            spNode.className = "text-font-normal";
+            spNode.innerHTML = pNode.innerHTML;
+            pNode.innerHTML = "";
+            pNode.appendChild(spNode);
+          }
+        }
+      }
+
+      function hasTextNodes(pNode){
+        cNodes = pNode.childNodes;
+        var l;
+        for (l=0; l < cNodes.length; l++){
+          if(cNodes[l].nodeType === 3){
+            return true;
+          }
+        }
+        return false;
+      }
+
+      var after = false; // TO set the cursor after/before of the node
+      var cursorNode;
+
+      // Calculating the caret position based on this dummyNode.
+      dNode = document.getElementById('dummyNode');
+      if(dNode.nextSibling){
+        cursorNode = dNode.nextSibling;
+      }else{
+        cursorNode = dNode.parentNode;
+        after = true;
+      }
+
+      dNode.parentNode.removeChild(dNode);
+
+      if(after){
+        this.composer.selection.setAfter(cursorNode)
+      }else {
+        this.composer.selection.setBefore(cursorNode)
+      }
+      
+
+      //End of modification
     }
   });
 })(wysihtml);
+
+
+// Added : Manoj
+function capitalise(string){
+  if(string.length>0){
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  }else{
+    return string
+  }
+}

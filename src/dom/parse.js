@@ -809,10 +809,7 @@ wysihtml.dom.parse = function(elementOrHtml_current, config_current) {
         "3": "wysiwyg-font-size-medium",
         "4": "wysiwyg-font-size-large",
         "5": "wysiwyg-font-size-x-large",
-        "6": "wysiwyg-font-size-xx-large",
-        "7": "wysiwyg-font-size-xx-large",
-        "-": "wysiwyg-font-size-smaller",
-        "+": "wysiwyg-font-size-larger"
+        "6": "wysiwyg-font-size-xx-large"
       };
       return function(attributeValue) {
         return mapping[String(attributeValue).charAt(0)];
