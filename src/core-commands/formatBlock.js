@@ -755,7 +755,8 @@
           // Options == null means block formatting should be removed from selection
           newBlockElements = formatSelection("remove", composer);
         }
-        
+
+        wysihtml.commands.formatInline.cleanEditor(composer);
       }
 
       // Remove empty block elements that may be left behind
