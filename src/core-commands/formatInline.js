@@ -650,16 +650,17 @@
     },
 
     cleanEditor: function(composer){
-      getPElements = composer.element.getElementsByTagName("P")
 
+      // check if composer is empty and create a p and span .
       if(composer.isEmpty()){
         var paragraph = composer.doc.createElement("P");
         var sp = composer.doc.createElement("span");
         sp.className = "text-font-normal";
         sp.innerHTML = "<br>"
         paragraph.appendChild(sp);
+        composer.element.innerHTML = "";
         composer.element.appendChild(paragraph);
-        if (!browser.displaysCaretInEmptyContentEditableCorrectly()) {
+        if (!wysihtml.browser.displaysCaretInEmptyContentEditableCorrectly()) {
           //paragraph.innerHTML = "<br>";
           composer.selection.setBefore(paragraph.firstChild.firstChild);
         } else {
@@ -670,9 +671,10 @@
       }
       
       var b = composer.selection.getBookmark();
+      var getPElements = composer.element.getElementsByTagName("P");
 
-      for(i=0; i < getPElements.length; i++){
-        pNode = getPElements[i]
+      for(i = 0; i < getPElements.length; i++){
+        pNode = getPElements[i];
         //if No span then add a text-font-normal span class
         if(pNode.firstChild && pNode.firstChild.nodeName != "SPAN"){
           spNode = composer.doc.createElement("span");
@@ -702,11 +704,14 @@
       //getPElements2 = this.element.getElementsByTagName("P")
 
       var j;
-      for(j=0; j < getPElements.length; j++) {
+      for(j = 0; j < getPElements.length; j++) {
         pNode = getPElements[j]
+        if (pNode.childNodes.length == 1){
+          continue;
+        }
         spanNodes = pNode.getElementsByTagName("span");
         var k;
-        for(k =0; k< spanNodes.length; k++){
+        for(k = 0; k < spanNodes.length; k++){
           // Dont delete if they have other nodes than span nodes.
           if(onlySpanNodes(spanNodes[k])){
             // delete the node and movse its children .
@@ -729,6 +734,7 @@
             }
           } 
         }
+        composer.selection.setBookmark(b);
       }
     }
   };
