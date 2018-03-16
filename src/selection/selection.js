@@ -928,9 +928,7 @@
           range.setEndAfter(element);
         }
 
-        /*
-        // SW-1645 This is deleting the previous "&nbsp" and deleting the span element and moves cursor to
-        // the beginning of line when trying to change the font-size in the middle of line
+        
         if (!wysihtml.dom.domNode(element).is.visible()) {
           if (wysihtml.dom.getTextContent(element) === '') {
             element.parentNode.removeChild(element);
@@ -938,7 +936,6 @@
             element.parentNode.replaceChild(this.doc.createTextNode(" "), element);
           }
         }
-        */
 
 
       }

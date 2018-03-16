@@ -7886,7 +7886,11 @@ wysihtml.dom.copyAttributes = function(attributesToCopy) {
         },
 
         visible: function() {
-          var isVisible = !(/^\s*$/g).test(wysihtml.dom.getTextContent(node));
+          // var isVisible = !(/^\s*$/g).test(wysihtml.dom.getTextContent(node));
+          // SW-1645 Need to differentiate between space and nbsp and nbsp are actually visible to the user.
+          // If the cursor was at beginning of line, with spaces before it and we changed the font the
+          // spaces were getting deleted because the editor thought all of the white space was invisible.
+          var isVisible = wysihtml.dom.getTextContent(node).replace(/\u00a0/g, "x").trim().length == 0;
 
           if (!isVisible) {
             if (node.nodeType === 1 && node.querySelector('img, br, hr, object, embed, canvas, input, textarea')) {
@@ -11480,9 +11484,7 @@ wysihtml.quirks.ensureProperClearing = (function() {
           range.setEndAfter(element);
         }
 
-        /*
-        // SW-1645 This is deleting the previous "&nbsp" and deleting the span element and moves cursor to
-        // the beginning of line when trying to change the font-size in the middle of line
+        
         if (!wysihtml.dom.domNode(element).is.visible()) {
           if (wysihtml.dom.getTextContent(element) === '') {
             element.parentNode.removeChild(element);
@@ -11490,7 +11492,6 @@ wysihtml.quirks.ensureProperClearing = (function() {
             element.parentNode.replaceChild(this.doc.createTextNode(" "), element);
           }
         }
-        */
 
 
       }
