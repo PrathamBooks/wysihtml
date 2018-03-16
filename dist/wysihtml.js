@@ -11165,7 +11165,7 @@ wysihtml.quirks.ensureProperClearing = (function() {
             return false;
           }
           var ws = this.win.getComputedStyle(startNode.parentNode).whiteSpace;
-          return (ws === "pre" || ws === "pre-wrap") ? range.startOffset === 0 : (/^\s*$/).test(startNode.data.substr(0,range.startOffset));
+          return (ws === "pre" || ws === "pre-wrap") ? range.startOffset === 0 : (startNode.data.substr(0,range.startOffset).replace(/\u00a0/g, "x").trim().length == 0);
         } else if (includeLineBreaks && wysihtml.dom.domNode(startNode).is.lineBreak()) {
           return true;
         } else {
@@ -11480,6 +11480,9 @@ wysihtml.quirks.ensureProperClearing = (function() {
           range.setEndAfter(element);
         }
 
+        /*
+        // SW-1645 This is deleting the previous "&nbsp" and deleting the span element and moves cursor to
+        // the beginning of line when trying to change the font-size in the middle of line
         if (!wysihtml.dom.domNode(element).is.visible()) {
           if (wysihtml.dom.getTextContent(element) === '') {
             element.parentNode.removeChild(element);
@@ -11487,6 +11490,7 @@ wysihtml.quirks.ensureProperClearing = (function() {
             element.parentNode.replaceChild(this.doc.createTextNode(" "), element);
           }
         }
+        */
 
 
       }
