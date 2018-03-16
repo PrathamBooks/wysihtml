@@ -405,7 +405,7 @@
     // Cleaing up the editor after pressing delete key or backspace key
     // Need Modification for chromium. In chromium when we get back to previous line,
     // the style doesn't get saved, instead we get an inline style with font-size.
-    if((keyCode === wysihtml.DELETE_KEY  || keyCode === wysihtml.BACKSPACE_KEY) && this.element.id === "txtEditor"){
+    if (keyCode === wysihtml.BACKSPACE_KEY && this.element.id === "txtEditor"){
       wysihtml.commands.formatInline.cleanEditor(this);
     }
   };
@@ -486,6 +486,15 @@
     if ((event.ctrlKey || event.metaKey) && !event.altKey && command) {
       this.commands.exec(command);
       event.preventDefault();
+    }
+
+    if (keyCode === wysihtml.DELETE_KEY){
+      event.preventDefault();
+      $("#delete_warning").show()
+      setTimeout((function(){
+        $("#delete_warning").hide();
+      }), 5000);
+      return;
     }
 
     if (keyCode === wysihtml.BACKSPACE_KEY) {
