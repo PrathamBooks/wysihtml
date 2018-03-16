@@ -649,10 +649,11 @@
       return (nodes.length === 0) ? false : nodes;
     },
 
+    // SW-1257, Clean the editor to get rid of extra spans, add new spans.
     cleanEditor: function(composer){
 
-      // check if composer is empty and create a p and span .
-      if(composer.isEmpty()){
+      // Check if composer is empty and create a p and span .
+      if (composer.isEmpty()){
         var paragraph = composer.doc.createElement("P");
         var sp = composer.doc.createElement("span");
         sp.className = "text-font-normal";
@@ -670,14 +671,15 @@
         return;
       }
       
-      var b = composer.selection.getBookmark();
+      var bMark = composer.selection.getBookmark(); // Bookmark to remember the cursor position.
       var getPElements = composer.element.getElementsByTagName("P");
 
+      // For all 'p' elements, if there is no span add a new 'text-font-normal' span.
       for(i = 0; i < getPElements.length; i++){
-        pNode = getPElements[i];
-        //if No span then add a text-font-normal span class
-        if(pNode.firstChild && pNode.firstChild.nodeName != "SPAN"){
-          spNode = composer.doc.createElement("span");
+        var pNode = getPElements[i];
+        
+        if (pNode.firstChild && pNode.firstChild.nodeName != "SPAN"){
+          var spNode = composer.doc.createElement("span");
           spNode.className = "text-font-normal";
           spNode.innerHTML = pNode.innerHTML;
           pNode.innerHTML = "";
@@ -685,48 +687,43 @@
         }
       }
       
+      // Check to see if a node has only span nodes as children.
       function onlySpanNodes(spNode) {
         var cNodes = spNode.childNodes;
-        var l;
 
-        if(cNodes && cNodes.length === 0){
+        if (cNodes && cNodes.length === 0){
           return true;
         }
 
-        for(l=0; l< cNodes.length; l++){
-          if(cNodes[l].nodeName !== "span" && cNodes[l].nodeName !== "BR"){
+        for (var l=0; l < cNodes.length; l++) {
+          if (cNodes[l].nodeName !== "span" && cNodes[l].nodeName !== "BR"){
             return false;
           }
         }
         return true;
       }
 
-      //getPElements2 = this.element.getElementsByTagName("P")
-
-      var j;
-      for(j = 0; j < getPElements.length; j++) {
-        pNode = getPElements[j]
-        if (pNode.childNodes.length == 1){
+      // Deleting the span nodes if it doesn't have any text which needs the styling
+      for(var j = 0; j < getPElements.length; j++) {
+        var pNode = getPElements[j]
+        if (pNode.childNodes.length === 1){
           continue;
         }
-        spanNodes = pNode.getElementsByTagName("span");
-        var k;
-        for(k = 0; k < spanNodes.length; k++){
+        var spanNodes = pNode.getElementsByTagName("span");
+        for(var k = 0; k < spanNodes.length; k++){
           // Dont delete if they have other nodes than span nodes.
           if(onlySpanNodes(spanNodes[k])){
             // delete the node and movse its children .
             if(k !== spanNodes.length-1){
-              var m;
               var no_of_childNodes = spanNodes[k].childNodes.length;
-              for (m =0 ; m < no_of_childNodes ; m++){
+              for (var m =0 ; m < no_of_childNodes ; m++){
                 spanNodes[k].parentNode.insertBefore(spanNodes[k].childNodes[0], spanNodes[k+1]);
               }
               spanNodes[k].parentNode.removeChild(spanNodes[k]);
               k--; 
             } else {
-              var n;
               var no_of_childNodes = spanNodes[k].childNodes.length;
-              for (n =0 ; n < no_of_childNodes ; n++){
+              for (var n =0 ; n < no_of_childNodes ; n++){
                 spanNodes[k].parentNode.appendChild(spanNodes[k].childNodes[0]);
               }              
               spanNodes[k].parentNode.removeChild(spanNodes[k]);
@@ -734,7 +731,8 @@
             }
           } 
         }
-        composer.selection.setBookmark(b);
+        // Setting the cursor to previously set bookmark
+        composer.selection.setBookmark(bMark);
       }
     }
   };

@@ -7,6 +7,7 @@ wysihtml.commands.bold = (function() {
     return {
         exec: function(composer, command) {
             wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+            // SW-1257, Cleaning up the editor.
             wysihtml.commands.formatInline.cleanEditor(composer);
         },
 
@@ -22,6 +23,8 @@ wysihtml.commands.fontSize = (function() {
     return {
         exec: function(composer, command, size) {
             wysihtml.commands.formatInline.exec(composer, command, {className: "text-font-" + size, classRegExp: REG_EXP, toggle: true});
+            // SW-1257, Cleaning up the editor.
+            wysihtml.commands.formatInline.cleanEditor(composer);
         },
 
         state: function(composer, command, size) {
@@ -80,6 +83,7 @@ wysihtml.commands.italic = (function() {
     return {
         exec: function(composer, command) {
             wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+            // SW-1257, Cleaning up the editor.
             wysihtml.commands.formatInline.cleanEditor(composer);
         },
 

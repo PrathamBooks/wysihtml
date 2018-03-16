@@ -13637,17 +13637,19 @@ wysihtml.Commands = Base.extend(
       return (nodes.length === 0) ? false : nodes;
     },
 
+    // SW-1257, Clean the editor to get rid of extra spans, add new spans.
     cleanEditor: function(composer){
-      getPElements = composer.element.getElementsByTagName("P")
 
-      if(composer.isEmpty()){
+      // Check if composer is empty and create a p and span .
+      if (composer.isEmpty()){
         var paragraph = composer.doc.createElement("P");
         var sp = composer.doc.createElement("span");
         sp.className = "text-font-normal";
         sp.innerHTML = "<br>"
         paragraph.appendChild(sp);
+        composer.element.innerHTML = "";
         composer.element.appendChild(paragraph);
-        if (!browser.displaysCaretInEmptyContentEditableCorrectly()) {
+        if (!wysihtml.browser.displaysCaretInEmptyContentEditableCorrectly()) {
           //paragraph.innerHTML = "<br>";
           composer.selection.setBefore(paragraph.firstChild.firstChild);
         } else {
@@ -13657,13 +13659,15 @@ wysihtml.Commands = Base.extend(
         return;
       }
       
-      var b = composer.selection.getBookmark();
+      var bMark = composer.selection.getBookmark(); // Bookmark to remember the cursor position.
+      var getPElements = composer.element.getElementsByTagName("P");
 
-      for(i=0; i < getPElements.length; i++){
-        pNode = getPElements[i]
-        //if No span then add a text-font-normal span class
-        if(pNode.firstChild && pNode.firstChild.nodeName != "SPAN"){
-          spNode = composer.doc.createElement("span");
+      // For all 'p' elements, if there is no span add a new 'text-font-normal' span.
+      for(i = 0; i < getPElements.length; i++){
+        var pNode = getPElements[i];
+        
+        if (pNode.firstChild && pNode.firstChild.nodeName != "SPAN"){
+          var spNode = composer.doc.createElement("span");
           spNode.className = "text-font-normal";
           spNode.innerHTML = pNode.innerHTML;
           pNode.innerHTML = "";
@@ -13671,45 +13675,43 @@ wysihtml.Commands = Base.extend(
         }
       }
       
+      // Check to see if a node has only span nodes as children.
       function onlySpanNodes(spNode) {
         var cNodes = spNode.childNodes;
-        var l;
 
-        if(cNodes && cNodes.length === 0){
+        if (cNodes && cNodes.length === 0){
           return true;
         }
 
-        for(l=0; l< cNodes.length; l++){
-          if(cNodes[l].nodeName !== "span" && cNodes[l].nodeName !== "BR"){
+        for (var l=0; l < cNodes.length; l++) {
+          if (cNodes[l].nodeName !== "span" && cNodes[l].nodeName !== "BR"){
             return false;
           }
         }
         return true;
       }
 
-      //getPElements2 = this.element.getElementsByTagName("P")
-
-      var j;
-      for(j=0; j < getPElements.length; j++) {
-        pNode = getPElements[j]
-        spanNodes = pNode.getElementsByTagName("span");
-        var k;
-        for(k =0; k< spanNodes.length; k++){
+      // Deleting the span nodes if it doesn't have any text which needs the styling
+      for(var j = 0; j < getPElements.length; j++) {
+        var pNode = getPElements[j]
+        if (pNode.childNodes.length === 1){
+          continue;
+        }
+        var spanNodes = pNode.getElementsByTagName("span");
+        for(var k = 0; k < spanNodes.length; k++){
           // Dont delete if they have other nodes than span nodes.
           if(onlySpanNodes(spanNodes[k])){
             // delete the node and movse its children .
             if(k !== spanNodes.length-1){
-              var m;
               var no_of_childNodes = spanNodes[k].childNodes.length;
-              for (m =0 ; m < no_of_childNodes ; m++){
+              for (var m =0 ; m < no_of_childNodes ; m++){
                 spanNodes[k].parentNode.insertBefore(spanNodes[k].childNodes[0], spanNodes[k+1]);
               }
               spanNodes[k].parentNode.removeChild(spanNodes[k]);
               k--; 
             } else {
-              var n;
               var no_of_childNodes = spanNodes[k].childNodes.length;
-              for (n =0 ; n < no_of_childNodes ; n++){
+              for (var n =0 ; n < no_of_childNodes ; n++){
                 spanNodes[k].parentNode.appendChild(spanNodes[k].childNodes[0]);
               }              
               spanNodes[k].parentNode.removeChild(spanNodes[k]);
@@ -13717,6 +13719,8 @@ wysihtml.Commands = Base.extend(
             }
           } 
         }
+        // Setting the cursor to previously set bookmark
+        composer.selection.setBookmark(bMark);
       }
     }
   };
@@ -15478,8 +15482,10 @@ wysihtml.views.View = Base.extend(
       this.parent.fire("newword:composer");
     }
 
-    // Author : Manoj, Date: 26/04/2017
-    // To handle the deletion of span tags when deleting the content.
+    // Issue: SW-1257
+    // Cleaing up the editor after pressing delete key or backspace key
+    // Need Modification for chromium. In chromium when we get back to previous line,
+    // the style doesn't get saved, instead we get an inline style with font-size.
     if((keyCode === wysihtml.DELETE_KEY  || keyCode === wysihtml.BACKSPACE_KEY) && this.element.id === "txtEditor"){
       wysihtml.commands.formatInline.cleanEditor(this);
     }
@@ -16764,6 +16770,7 @@ wysihtml.commands.bold = (function() {
     return {
         exec: function(composer, command) {
             wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+            // SW-1257, Cleaning up the editor.
             wysihtml.commands.formatInline.cleanEditor(composer);
         },
 
@@ -16779,6 +16786,8 @@ wysihtml.commands.fontSize = (function() {
     return {
         exec: function(composer, command, size) {
             wysihtml.commands.formatInline.exec(composer, command, {className: "text-font-" + size, classRegExp: REG_EXP, toggle: true});
+            // SW-1257, Cleaning up the editor.
+            wysihtml.commands.formatInline.cleanEditor(composer);
         },
 
         state: function(composer, command, size) {
@@ -16837,6 +16846,7 @@ wysihtml.commands.italic = (function() {
     return {
         exec: function(composer, command) {
             wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+            // SW-1257, Cleaning up the editor.
             wysihtml.commands.formatInline.cleanEditor(composer);
         },
 
@@ -17203,6 +17213,7 @@ wysihtml.commands.subscript = (function() {
     return {
         exec: function(composer, command) {
             wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+            // SW-1257, Cleaning up the editor.
             wysihtml.commands.formatInline.cleanEditor(composer);
         },
 
@@ -17222,6 +17233,7 @@ wysihtml.commands.superscript = (function() {
     return {
         exec: function(composer, command) {
             wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+            // SW-1257, Cleaning up the editor.
             wysihtml.commands.formatInline.cleanEditor(composer);
         },
 
@@ -17241,6 +17253,7 @@ wysihtml.commands.underline = (function() {
     return {
         exec: function(composer, command) {
             wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+            // SW-1257, Cleaning up the editor.
             wysihtml.commands.formatInline.cleanEditor(composer);
         },
 

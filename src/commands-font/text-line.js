@@ -7,6 +7,7 @@ wysihtml.commands.subscript = (function() {
     return {
         exec: function(composer, command) {
             wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+            // SW-1257, Cleaning up the editor.
             wysihtml.commands.formatInline.cleanEditor(composer);
         },
 
@@ -26,6 +27,7 @@ wysihtml.commands.superscript = (function() {
     return {
         exec: function(composer, command) {
             wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+            // SW-1257, Cleaning up the editor.
             wysihtml.commands.formatInline.cleanEditor(composer);
         },
 
@@ -45,6 +47,7 @@ wysihtml.commands.underline = (function() {
     return {
         exec: function(composer, command) {
             wysihtml.commands.formatInline.exec(composer, command, nodeOptions);
+            // SW-1257, Cleaning up the editor.
             wysihtml.commands.formatInline.cleanEditor(composer);
         },
 

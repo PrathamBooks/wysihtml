@@ -401,8 +401,10 @@
       this.parent.fire("newword:composer");
     }
 
-    // Author : Manoj, Date: 26/04/2017
-    // To handle the deletion of span tags when deleting the content.
+    // Issue: SW-1257
+    // Cleaing up the editor after pressing delete key or backspace key
+    // Need Modification for chromium. In chromium when we get back to previous line,
+    // the style doesn't get saved, instead we get an inline style with font-size.
     if((keyCode === wysihtml.DELETE_KEY  || keyCode === wysihtml.BACKSPACE_KEY) && this.element.id === "txtEditor"){
       wysihtml.commands.formatInline.cleanEditor(this);
     }
