@@ -497,6 +497,15 @@
       return;
     }
 
+    if (keyCode === wysihtml.TAB_KEY){
+      event.preventDefault();
+      $("#tab_warning").show();
+      setTimeout((function(){
+        $("#tab_warning").hide();
+      }), 5000);
+      return;
+    }
+
     if (keyCode === wysihtml.BACKSPACE_KEY) {
       // Delete key override for special cases
       handleDeleteKeyPress(event, this);
