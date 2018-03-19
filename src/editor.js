@@ -266,6 +266,23 @@
       this.composer.selection.deleteContents();
       this.composer.selection.insertHTML(cleanHtml);
 
+      // Adding a dummy last node to identify the end of copy/paste
+
+      // Node which is before the caret.
+      var caretPreviousNode = this.composer.selection.getBeforeSelection(true).node;
+
+      var dummyPNode = this.composer.doc.createElement('span');
+      dummyPNode.setAttribute("id", "dummyNode");
+
+      if (caretPreviousNode.nextSibling !== null){
+        caretPreviousNode.nextSibling.parentNode.insertBefore(dummyPNode, caretPreviousNode.nextSibling);
+      } else {
+        caretPreviousNode.parentNode.appendChild(dummyPNode);
+      }
+
+      this.composer.selection.setAfter(caretPreviousNode);
+
+
       // Default case
       try {
         // Limit node where we have to close the tags
@@ -278,8 +295,7 @@
           if (beginLimParent.nodeType ===3 && beginLimParent.parentNode.nodeName == 'P') {
             // No need to do additional processing
             parentPNode = beginLimParent.parentNode;  
-          }
-          else {
+          } else {
             while(beginLimParent.parentNode.nodeName != 'P'){
               beginLimParent = beginLimParent.parentNode;
             }

@@ -838,11 +838,6 @@
           fragment.appendChild(node.firstChild);
         }
 
-        //Adding a dummy last node to identify the end of copy/paste
-        var dummyPNode = this.doc.createElement('span');
-        dummyPNode.setAttribute("id","dummyNode");
-        fragment.appendChild(dummyPNode);
-
         range.insertNode(fragment);
 
         lastEditorElement = this.contain.lastChild;
