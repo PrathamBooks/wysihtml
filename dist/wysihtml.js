@@ -16449,12 +16449,19 @@ wysihtml.views.Textarea = wysihtml.views.View.extend(
         }
 
 
-
-        getPElements = this.composer.element.getElementsByTagName("P")
+        // Removing empty p tags and adding span class to tags where style is not applied
+        var getPElements = this.composer.element.getElementsByTagName("P")
         var i;
         for(i=0; i < getPElements.length; i++){
-          pNode = getPElements[i]
-          if(hasTextNodes(pNode)){
+          var pNode = getPElements[i];
+
+          if (pNode.childNodes.length == 0){
+            pNode.parentNode.removeChild(pNode);
+            i--;
+            continue;
+          }
+
+          if (hasTextNodes(pNode)){
             spNode = this.composer.doc.createElement("span");
             spNode.className = "text-font-normal";
             spNode.innerHTML = pNode.innerHTML;
