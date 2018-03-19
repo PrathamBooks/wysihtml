@@ -743,11 +743,7 @@
         // If selection is caret expand it to cover nearest suitable block element or row if none found
         if (composer.selection.isCollapsed()) {
           bookmark = rangy.saveSelection(composer.win);
-          if (caretIsOnEmptyLine(composer)) {
-            composer.selection.selectLine();
-          } else {
-            expandCaretToBlock(composer, options && options.nodeName ? options.nodeName.toUpperCase() : undefined);
-          }
+          expandCaretToBlock(composer, options && options.nodeName ? options.nodeName.toUpperCase() : undefined);
         }
         if (options) {
           newBlockElements = formatSelection("apply", composer, options);
@@ -756,7 +752,6 @@
           newBlockElements = formatSelection("remove", composer);
         }
 
-        wysihtml.commands.formatInline.cleanEditor(composer);
       }
 
       // Remove empty block elements that may be left behind
@@ -769,6 +764,7 @@
       } else {
         selectElements(newBlockElements, composer);
       }
+      wysihtml.commands.formatInline.cleanEditor(composer);
     },
     
     // Removes all block formatting from selection
