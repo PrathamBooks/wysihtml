@@ -13658,19 +13658,6 @@ wysihtml.Commands = Base.extend(
       var bMark = composer.selection.getBookmark(); // Bookmark to remember the cursor position.
       var getPElements = composer.element.getElementsByTagName("P");
 
-      // For all 'p' elements, if there is no span add a new 'text-font-normal' span.
-      for(i = 0; i < getPElements.length; i++){
-        var pNode = getPElements[i];
-        
-        if (pNode.firstChild && pNode.firstChild.nodeName != "SPAN"){
-          var spNode = composer.doc.createElement("span");
-          spNode.className = "text-font-normal";
-          spNode.innerHTML = pNode.innerHTML;
-          pNode.innerHTML = "";
-          pNode.appendChild(spNode);
-        }
-      }
-      
       // Check to see if a node has only span nodes as children.
       function onlySpanNodes(spNode) {
         var cNodes = spNode.childNodes;
@@ -13715,6 +13702,38 @@ wysihtml.Commands = Base.extend(
             }
           } 
         }
+
+        // Removing any extra span nodes
+        var getAllSpanNodes = composer.element.getElementsByTagName("span");
+
+        for(var l = 0; l < getAllSpanNodes.length; l++){
+          var spNode = getAllSpanNodes[l];
+          if (spNode.innerHTML == ""){
+
+            spNode.parentNode.removeChild(spNode);
+            l--;
+          }
+        }
+
+        // For all 'p' elements, if there is no span add a new 'text-font-normal' span.
+        for (var i = 0; i < getPElements.length; i++){
+          var pNode = getPElements[i];
+
+          if (pNode.childrens.length === 0){
+            pNode.parentNode.removeChild(pNode);
+            i--;
+            continue;
+          }
+
+          if (pNode.firstChild && pNode.firstChild.nodeName != "SPAN") {
+            var spNode = composer.doc.createElement("span");
+            spNode.className = "text-font-normal";
+            spNode.innerHTML = pNode.innerHTML;
+            pNode.innerHTML = "";
+            pNode.appendChild(spNode);
+          }
+        }
+
         // Setting the cursor to previously set bookmark
         composer.selection.setBookmark(bMark);
       }
