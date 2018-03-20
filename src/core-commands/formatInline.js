@@ -735,7 +735,7 @@
         for (var i = 0; i < getPElements.length; i++){
           var pNode = getPElements[i];
 
-          if (pNode.childrens.length === 0){
+          if (pNode.children.length === 0){
             pNode.parentNode.removeChild(pNode);
             i--;
             continue;

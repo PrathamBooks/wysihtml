@@ -259,7 +259,8 @@
       
       // Date :09.02.2017  Author : Manoj
       // Getting the initial nodes and position of the marker
-      var beginSel = window.getSelection();
+      // var beginSel = window.getSelection();
+      var beginSel = this.composer.selection.getSelection();
       var bAncNode = beginSel.anchorNode;
       var bOffSet = beginSel.anchorOffset;
 
@@ -536,7 +537,8 @@
       var cursorNode;
 
       // Calculating the caret position based on this dummyNode.
-      dNode = document.getElementById('dummyNode');
+      // dNode = document.getElementById('dummyNode');
+      var dNode = this.composer.doc.getElementById('dummyNode');
       if(dNode.nextSibling){
         cursorNode = dNode.nextSibling;
       }else{
