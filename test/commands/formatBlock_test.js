@@ -118,9 +118,9 @@ if (wysihtml.browser.supported()) {
 
       editor.composer.commands.exec('alignRightStyle');
       editor.composer.commands.exec('alignRightStyle');
-      equal(editableElement.innerHTML.toLowerCase(), '<h1>once upon a time</h1>there was an unformated text<br>spanning many lines.', "heading alignment with style removed sucessfully");        
+      equal(editableElement.innerHTML.toLowerCase(), '<p><span class=\"text-font-normal\">once upon a time</span></p>there was an unformated text<br>spanning many lines.', "heading changed to paragraph");
       editor.composer.commands.exec('formatBlock', "p");
-      equal(editableElement.innerHTML.toLowerCase(), '<p>once upon a time</p>there was an unformated text<br>spanning many lines.', "heading changed to paragraph");
+      equal(editableElement.innerHTML.toLowerCase(), '<p><span class=\"text-font-normal\">once upon a time</span></p>there was an unformated text<br>spanning many lines.', "heading changed to paragraph");
 
       // Tests covering multiple block elements
 
@@ -134,16 +134,16 @@ if (wysihtml.browser.supported()) {
 
       prepareMutipleBlocks(true);
       editor.composer.commands.exec('formatBlock', "h2");
-      equal(editableElement.innerHTML.toLowerCase(), '<h1>once </h1><h2>upon a time</h2><h2>there</h2><p> was a formated text</p>spanning many lines.', "Selection covering 2 blocks escaped to heading 2");
+      equal(editableElement.innerHTML.toLowerCase(), '<h1>once </h1><h2>upon a time</h2><h2>there</h2><p><span class=\"text-font-normal\"> was a formated text</span></p>spanning many lines.', "Selection covering 2 blocks escaped to heading 2");
 
       prepareMutipleBlocks(true);
       editor.composer.commands.exec('formatBlock');
-      equal(editableElement.innerHTML.toLowerCase(), '<h1>once </h1>upon a time<br>there<br><p> was a formated text</p>spanning many lines.', "Format removed from Selection covering 2 blocks");
+      equal(editableElement.innerHTML.toLowerCase(), '<h1>once </h1>upon a time<br>there<br><p><span class=\"text-font-normal\"> was a formated text</span></p>spanning many lines.', "Format removed from Selection covering 2 blocks");
 
       prepareMutipleBlocks(true);
       editor.composer.commands.exec('formatBlock', "h1");
       editor.composer.commands.exec('formatBlock', "h2");
-      equal(editableElement.innerHTML.toLowerCase(), '<h1>once </h1><h2>upon a time</h2><h2>there</h2><p> was a formated text</p>spanning many lines.', "Selection covering multiple blocks preserved fot subsequent modifications");
+      equal(editableElement.innerHTML.toLowerCase(), '<h1>once </h1><h2>upon a time</h2><h2>there</h2><p><span class=\"text-font-normal\"> was a formated text</span></p>spanning many lines.', "Selection covering multiple blocks preserved fot subsequent modifications");
 
       // Tests selection preserving on toggle and line breaks handling to it
 
@@ -270,7 +270,7 @@ if (wysihtml.browser.supported()) {
       editor.setValue("<p>foo</p><br>goo<br><p>bar</p>", true);
       editor.composer.selection.selectNode(editor.editableElement.childNodes[2]);
       editor.composer.commands.exec('formatBlock', "h1");
-      equal(editableElement.innerHTML.toLowerCase(), "<p>foo</p><br><h1>goo</h1><p>bar</p>", "Surrounding visual linebreaks removed and nearby block elements taken into equation");
+      equal(editableElement.innerHTML.toLowerCase(), "<p><span class=\"text-font-normal\">foo</span></p><br><h1>goo</h1><p><span class=\"text-font-normal\">bar</span></p>", "Surrounding visual linebreaks removed and nearby block elements taken into equation");
       
       editor.setValue("foo<h1>goo</h1>bar", true);
       editor.composer.selection.selectNode(editor.editableElement.childNodes[1]);
@@ -280,7 +280,7 @@ if (wysihtml.browser.supported()) {
       editor.setValue("<p>foo</p><h1>goo</h1><p>bar</p>", true);
       editor.composer.selection.selectNode(editor.editableElement.childNodes[1]);
       editor.composer.commands.exec('formatBlock', {nodeName: "h1", toggle: true});
-      equal(editableElement.innerHTML.toLowerCase(), "<p>foo</p>goo<p>bar</p>", "Removing block format in between other block formatting does not add linebreaks");
+      equal(editableElement.innerHTML.toLowerCase(), "<p><span class=\"text-font-normal\">foo</span></p>goo<p><span class=\"text-font-normal\">bar</span></p>", "Removing block format in between other block formatting does not add linebreaks");
       
       editor.setValue("foo<br><h1>goo</h1><br>bar", true);
       editor.composer.selection.selectNode(editor.editableElement.childNodes[2]);
@@ -334,7 +334,7 @@ if (wysihtml.browser.supported()) {
           }
         }
       }),
-      text = "<h1>heading</h1><p>text</p>",
+      text = "<h1>heading</h1><p><span class=\"text-font-normal\">text</span></p>",
       text2 = "test<h1>heading</h1>test";
 
     editor.on("load", function() {

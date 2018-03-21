@@ -9570,12 +9570,12 @@ wysihtml.dom.parse = function(elementOrHtml_current, config_current) {
 
     size_font: (function() {
       var mapping = {
-        "1": "wysiwyg-font-size-xx-small",
-        "2": "wysiwyg-font-size-small",
-        "3": "wysiwyg-font-size-medium",
-        "4": "wysiwyg-font-size-large",
-        "5": "wysiwyg-font-size-x-large",
-        "6": "wysiwyg-font-size-xx-large"
+        "1": "text-font-normal",
+        "2": "text-font-largest",
+        "3": "text-font-large",
+        "4": "text-font-medium",
+        "5": "text-font-small",
+        "6": "text-font-smallest"
       };
       return function(attributeValue) {
         return mapping[String(attributeValue).charAt(0)];

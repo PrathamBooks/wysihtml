@@ -502,14 +502,12 @@ if (wysihtml.browser.supported()) {
   test("Advanced tests for 'font' elements", function() {
     var rules = {
       classes: {
-        "wysiwyg-font-size-xx-small": 1,
-        "wysiwyg-font-size-small":    1,
-        "wysiwyg-font-size-medium":   1,
-        "wysiwyg-font-size-large":    1,
-        "wysiwyg-font-size-x-large":  1,
-        "wysiwyg-font-size-xx-large": 1,
-        "wysiwyg-font-size-smaller":  1,
-        "wysiwyg-font-size-larger":   1
+        "text-font-normal": 1,
+        "text-font-largest": 1,
+        "text-font-large": 1,
+        "text-font-medium": 1,
+        "text-font-small": 1,
+        "text-font-smallest": 1
       },
       tags: {
         font: {
@@ -524,7 +522,7 @@ if (wysihtml.browser.supported()) {
         '<font size="1">foo</font>',
         rules
       ),
-      '<span class="wysiwyg-font-size-xx-small">foo</span>'
+      '<span class="text-font-normal">foo</span>'
     );
     
     this.equal(
@@ -532,7 +530,7 @@ if (wysihtml.browser.supported()) {
         '<font size="2">foo</font>',
         rules
       ),
-      '<span class="wysiwyg-font-size-small">foo</span>'
+      '<span class="text-font-largest">foo</span>'
     );
     
     this.equal(
@@ -540,7 +538,7 @@ if (wysihtml.browser.supported()) {
         '<font size="3">foo</font>',
         rules
       ),
-      '<span class="wysiwyg-font-size-medium">foo</span>'
+      '<span class="text-font-large">foo</span>'
     );
     
     this.equal(
@@ -548,7 +546,7 @@ if (wysihtml.browser.supported()) {
         '<font size="4">foo</font>',
         rules
       ),
-      '<span class="wysiwyg-font-size-large">foo</span>'
+      '<span class="text-font-medium">foo</span>'
     );
     
     this.equal(
@@ -556,7 +554,7 @@ if (wysihtml.browser.supported()) {
         '<font size="5">foo</font>',
         rules
       ),
-      '<span class="wysiwyg-font-size-x-large">foo</span>'
+      '<span class="text-font-small">foo</span>'
     );
     
     this.equal(
@@ -564,32 +562,9 @@ if (wysihtml.browser.supported()) {
         '<font size="6">foo</font>',
         rules
       ),
-      '<span class="wysiwyg-font-size-xx-large">foo</span>'
+      '<span class="text-font-smallest">foo</span>'
     );
     
-    this.equal(
-      this.sanitize(
-        '<font size="7">foo</font>',
-        rules
-      ),
-      '<span class="wysiwyg-font-size-xx-large">foo</span>'
-    );
-    
-    this.equal(
-      this.sanitize(
-        '<font size="+1">foo</font>',
-        rules
-      ),
-      '<span class="wysiwyg-font-size-larger">foo</span>'
-    );
-    
-    this.equal(
-      this.sanitize(
-        '<font size="-1">foo</font>',
-        rules
-      ),
-      '<span class="wysiwyg-font-size-smaller">foo</span>'
-    );
   });
   
   
