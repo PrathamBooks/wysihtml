@@ -26,7 +26,6 @@ module.exports = function(grunt) {
     'src/views/sourceview.js',
     'src/views/textarea.js',
     'src/editor.js',
-    'src/commands-font/*',
     'src/table.js',
     'src/dialog.js'
   ];

@@ -657,7 +657,7 @@
         var paragraph = composer.doc.createElement("P");
         var sp = composer.doc.createElement("span");
         sp.className = "text-font-normal";
-        sp.innerHTML = "<br>"
+        sp.innerHTML += "<br>"
         paragraph.appendChild(sp);
         composer.element.innerHTML = "";
         composer.element.appendChild(paragraph);
@@ -735,7 +735,7 @@
         for (var i = 0; i < getPElements.length; i++){
           var pNode = getPElements[i];
 
-          if (pNode.children.length === 0){
+          if (pNode.childNodes.length === 0){
             pNode.parentNode.removeChild(pNode);
             i--;
             continue;
