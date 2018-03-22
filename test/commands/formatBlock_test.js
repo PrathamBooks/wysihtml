@@ -118,7 +118,7 @@ if (wysihtml.browser.supported()) {
 
       editor.composer.commands.exec('alignRightStyle');
       editor.composer.commands.exec('alignRightStyle');
-      equal(editableElement.innerHTML.toLowerCase(), '<p><span class=\"text-font-normal\">once upon a time</span></p>there was an unformated text<br>spanning many lines.', "heading changed to paragraph");
+      equal(editableElement.innerHTML.toLowerCase(), '<h1>once upon a time</h1>there was an unformated text<br>spanning many lines.', "heading alignment with style removed sucessfully");        
       editor.composer.commands.exec('formatBlock', "p");
       equal(editableElement.innerHTML.toLowerCase(), '<p><span class=\"text-font-normal\">once upon a time</span></p>there was an unformated text<br>spanning many lines.', "heading changed to paragraph");
 
