@@ -15732,7 +15732,7 @@ wysihtml.views.View = Base.extend(
       }, 250);
     }
 
-    actions.addListeners(focusBlurElement, ['drop', 'paste', 'mouseup', 'focus', 'keyup'], handleUserInteraction.bind(this));
+    actions.addListeners(focusBlurElement, ['drop', 'paste', 'mouseup', 'focus', 'keyup', 'click'], handleUserInteraction.bind(this));
     focusBlurElement.addEventListener('focus', handleFocus.bind(this), false);
     focusBlurElement.addEventListener('blur',  handleBlur.bind(this), false);
 
