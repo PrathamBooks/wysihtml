@@ -724,8 +724,27 @@
   wysihtml.commands.formatBlock = {
     exec: function(composer, command, options) {
       options = parseOptions(options);
-      var newBlockElements = [],
-          ranges, range, bookmark, state, closestBlockName;
+
+      // SW-2877 select font size class from the selected range text
+      // Set it to text in clean editor
+      var ranges = composer.selection.getOwnRanges(),
+        range,
+        textContainer,
+        outerClass;
+      if (ranges.length === 1) {
+        range = ranges[0];
+        textContainer = range.startContainer;
+        
+        while(textContainer && textContainer.tagName !== "SPAN" && textContainer.tagName != "P"){
+          textContainer = textContainer.parentNode;
+        }
+        if (textContainer && textContainer.tagName === "SPAN"){
+          outerClass = textContainer.className;
+        }
+        
+      }
+      
+      var newBlockElements = [], bookmark, state, closestBlockName;
 
       // Find if current format state is active if options.toggle is set as true
       // In toggle case active state elemets are formatted instead of working directly on selection
@@ -764,7 +783,7 @@
       } else {
         selectElements(newBlockElements, composer);
       }
-      wysihtml.commands.formatInline.cleanEditor(composer);
+      wysihtml.commands.formatInline.cleanEditor(composer, outerClass);
     },
     
     // Removes all block formatting from selection

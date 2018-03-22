@@ -650,7 +650,7 @@
     },
 
     // SW-1257, Clean the editor to get rid of extra spans, add new spans.
-    cleanEditor: function(composer){
+    cleanEditor: function(composer, outerClass){
 
       // Check if composer is empty and create a p and span .
       if (composer.isEmpty()){
@@ -744,7 +744,7 @@
 
         if (pNode.firstChild && pNode.firstChild.nodeName != "SPAN") {
           var spNode = composer.doc.createElement("span");
-          spNode.className = "text-font-normal";
+          spNode.className = outerClass || "text-font-normal";
           spNode.innerHTML = pNode.innerHTML;
           pNode.innerHTML = "";
           pNode.appendChild(spNode);

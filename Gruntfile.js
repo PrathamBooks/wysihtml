@@ -27,7 +27,8 @@ module.exports = function(grunt) {
     'src/views/textarea.js',
     'src/editor.js',
     'src/table.js',
-    'src/dialog.js'
+    'src/dialog.js',
+    'src/extra-commands/*.js'
   ];
 
   // Project configuration.
@@ -42,11 +43,11 @@ module.exports = function(grunt) {
       dist: {
         src: base,
         dest: 'dist/<%= pkg.name %>.js'
-      },
-      extracommands: {
-        src: 'src/extra-commands/*.js',
-        dest: 'dist/<%= pkg.name %>.all-commands.js'
       }
+      // extracommands: {
+      //   src: 'src/extra-commands/*.js',
+      //   dest: 'dist/<%= pkg.name %>.all-commands.js'
+      // }
     },
     uglify: {
       options: {
@@ -57,12 +58,12 @@ module.exports = function(grunt) {
         files: {
           'dist/minified/<%= pkg.name %>.min.js': 'dist/<%= pkg.name %>.js',
         }
-      },
-      extracommands: {
-        files: {
-          'dist/minified/<%= pkg.name %>.all-commands.min.js': 'dist/<%= pkg.name %>.all-commands.js'
-        }
       }
+      // extracommands: {
+      //   files: {
+      //     'dist/minified/<%= pkg.name %>.all-commands.min.js': 'dist/<%= pkg.name %>.all-commands.js'
+      //   }
+      // }
     },
     open: {
       test: {
@@ -74,10 +75,10 @@ module.exports = function(grunt) {
         files: base,
         tasks: ['concat:dist', 'uglify:dist']
       },
-      extracommands: {
-        files: ['src/extra-commands/*.js'],
-        tasks: ['concat:extracommands', 'uglify:extracommands']
-      },
+      // extracommands: {
+      //   files: ['src/extra-commands/*.js'],
+      //   tasks: ['concat:extracommands', 'uglify:extracommands']
+      // },
       extensions: {
         files: ['./src/extensions/*/*.js'],
         tasks: ['build-modules']
