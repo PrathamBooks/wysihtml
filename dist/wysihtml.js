@@ -8914,6 +8914,11 @@ wysihtml.dom.parse = function(elementOrHtml_current, config_current) {
         return oldNode;
     }
 
+    // Passes directly elements with has_comments class
+    if (oldNodeType === 1 && wysihtml.dom.hasClass(oldNode, 'has_comments')) {
+      return oldNode;
+    }
+
     newNode = method && method(oldNode, clearInternals);
 
     // Remove or unwrap node in case of return value null or false
